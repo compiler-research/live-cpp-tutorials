@@ -1,4 +1,4 @@
-name: Check C++ Notebooks
+name: Check notebooks
 
 on:
   push:
@@ -6,13 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  execute-notebooks:
+  execute-notebooks-cpp:
     name: Execute C++ Notebooks
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -el {0}
-        
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,5 +35,101 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: executed-cpp-notebooks
+          path: executed/
+          if-no-files-found: ignore
+
+  execute-notebooks-openmp:
+    name: Execute OpenMP notebooks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: List available kernels
+        run: jupyter kernelspec list
+
+      - name: Run OpenMP notebook tests
+        run: |
+          mkdir -p executed
+          
+          # Force OpenMP to spawn 8 threads to match your reference .ipynb files
+          export OMP_NUM_THREADS=8
+          
+          LD_PRELOAD="$CONDA_PREFIX/lib/libomp.so" \
+            $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::OpenMPNotebookTests -sv
+
+      - name: Upload executed OpenMP notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-openmp-notebooks
+          path: executed/
+          if-no-files-found: ignore
+          
+  execute-notebooks-cuda:
+    name: Execute CUDA notebooks
+    runs-on: [self-hosted, cuda]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: Install CUDA kernel
+        run: |
+          cp -r $CONDA_PREFIX/share/jupyter/kernels/xcpp23 $CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda
+          python3 -c "
+          import json
+          with open('$CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda/kernel.json') as f:
+              k = json.load(f)
+          k['argv'] += ['--cuda', '--cuda-path=$CONDA_PREFIX/targets/x86_64-linux']
+          with open('$CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda/kernel.json', 'w') as f:
+              json.dump(k, f, indent=2)
+          "
+
+      - name: Execute CUDA notebooks
+        run: |
+          set +e
+          mkdir -p executed
+          failed=0
+          for nb in cuda/*.ipynb; do
+            echo "=== Executing $nb ==="
+            jupyter nbconvert --to notebook --execute "$nb" \
+              --ExecutePreprocessor.kernel_name=xcpp23-cuda \
+              --output "../executed/$(basename "$nb")" \
+              --ExecutePreprocessor.timeout=300
+            if [ $? -ne 0 ]; then
+              echo "::error file=$nb::Failed to execute $nb"
+              failed=$((failed + 1))
+            fi
+          done
+          echo "=== Summary: $failed notebook(s) failed ==="
+          exit $failed
+
+      - name: Print notebook outputs
+        if: always()
+        run: |
+          for nb in executed/*.ipynb; do
+            python scripts/print_nb_output.py "$nb" "$(basename "$nb")"
+          done
+
+      - name: Upload executed notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-cuda-notebooks
           path: executed/
           if-no-files-found: ignore

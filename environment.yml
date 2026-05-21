@@ -1,9 +1,15 @@
 name: livecpp-ci
 channels:
   - conda-forge
+  - nvidia
 dependencies:
   - python>=3.11
   - xeus-cpp
   - jupyter
+  - nbconvert
+  - llvm-openmp
+  - cuda-toolkit=12
+  - clangdev=21
+  - cuda-cudart-dev
   - papermill
   - pytest
