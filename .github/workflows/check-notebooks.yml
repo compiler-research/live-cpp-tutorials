@@ -28,7 +28,7 @@ jobs:
       - name: Run C++ Tests via Pytest
         run: |
           mkdir -p executed
-          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py -sv
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::CppNotebookTests -sv
 
       - name: Upload executed notebooks as artifact
         if: always()
@@ -78,6 +78,9 @@ jobs:
   execute-notebooks-cuda:
     name: Execute CUDA notebooks
     runs-on: [self-hosted, cuda]
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -100,31 +103,10 @@ jobs:
               json.dump(k, f, indent=2)
           "
 
-      - name: Execute CUDA notebooks
+      - name: Run CUDA Tests via Pytest
         run: |
-          set +e
           mkdir -p executed
-          failed=0
-          for nb in cuda/*.ipynb; do
-            echo "=== Executing $nb ==="
-            jupyter nbconvert --to notebook --execute "$nb" \
-              --ExecutePreprocessor.kernel_name=xcpp23-cuda \
-              --output "../executed/$(basename "$nb")" \
-              --ExecutePreprocessor.timeout=300
-            if [ $? -ne 0 ]; then
-              echo "::error file=$nb::Failed to execute $nb"
-              failed=$((failed + 1))
-            fi
-          done
-          echo "=== Summary: $failed notebook(s) failed ==="
-          exit $failed
-
-      - name: Print notebook outputs
-        if: always()
-        run: |
-          for nb in executed/*.ipynb; do
-            python scripts/print_nb_output.py "$nb" "$(basename "$nb")"
-          done
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::CudaNotebookTests -sv
 
       - name: Upload executed notebooks as artifact
         if: always()

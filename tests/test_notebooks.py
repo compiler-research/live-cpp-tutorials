@@ -172,7 +172,7 @@ class BaseNotebookTests(unittest.TestCase):
                             )
 
 
-class NotebookTests(BaseNotebookTests):
+class CppNotebookTests(BaseNotebookTests):
     __test__ = True
     kernel_name = 'xcpp23'  # standard core c++ kernel
     notebook_dir = 'xeus-cpp'
@@ -186,7 +186,7 @@ class OpenMPNotebookTests(BaseNotebookTests):
     should_sort_parallel_outputs = True   # uses parallel filters
 
 
-class CUDANotebookTests(BaseNotebookTests):
+class CudaNotebookTests(BaseNotebookTests):
     __test__ = True
     kernel_name = 'xcpp23-cuda'
     notebook_dir = 'cuda'
