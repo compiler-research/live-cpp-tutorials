@@ -93,8 +93,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Activate micromamba environment
-        run: micromamba activate livecpp-ci
+      - name: Set up micromamba environment
+        run: |
+          /root/micromamba-bin/micromamba env update -n livecpp-ci -f environment.yml --yes
+          echo "CONDA_PREFIX=/root/micromamba/envs/livecpp-ci" >> $GITHUB_ENV
 
       - name: Install CUDA kernel
         run: |
