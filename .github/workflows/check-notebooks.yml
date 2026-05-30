@@ -76,6 +76,7 @@ jobs:
           if-no-files-found: ignore
           
   execute-notebooks-cuda:
+    needs: prepare-dell
     name: Execute CUDA notebooks
     runs-on: [self-hosted, cuda]
     defaults:
