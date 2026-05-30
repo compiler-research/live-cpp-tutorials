@@ -74,10 +74,18 @@ jobs:
           name: executed-openmp-notebooks
           path: executed/
           if-no-files-found: ignore
-          
+
+  prepare-dell:
+    runs-on: [self-hosted, spotter]
+    steps:
+      - uses: compiler-research/ci-workflows/actions/wake-on-lan@main
+        with:
+          mac: a4:bb:6d:51:d5:d2
+          target-host: 192.168.100.30
+  
   execute-notebooks-cuda:
-    needs: prepare-dell
     name: Execute CUDA notebooks
+    needs: prepare-dell
     runs-on: [self-hosted, cuda]
     defaults:
       run:
