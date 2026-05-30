@@ -95,8 +95,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up micromamba environment
         run: |
-          /root/micromamba-bin/micromamba env update -n livecpp-ci -f environment.yml --yes
-          echo "CONDA_PREFIX=/root/micromamba/envs/livecpp-ci" >> $GITHUB_ENV
+          /root/micromamba-bin/micromamba create -n livecpp-ci -f environment.yml --yes
+          echo "CONDA_PREFIX=/root/.local/share/mamba/envs/livecpp-ci" >> $GITHUB_ENV
 
       - name: Install CUDA kernel
         run: |
