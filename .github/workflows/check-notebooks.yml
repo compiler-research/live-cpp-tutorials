@@ -93,12 +93,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up micromamba environment
-        uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-file: environment.yml
-          download-micromamba: false
+	
+      - name: Activate micromamba environment
+        run: micromamba activate livecpp-ci
 
       - name: Install CUDA kernel
         run: |
