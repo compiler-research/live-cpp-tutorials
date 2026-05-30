@@ -61,6 +61,7 @@ def sanitize_and_sort_output(text):
             cleaned = re.sub(r'\d+(\.\d+)?x', 'x.xx', cleaned)
             
             # parse floats/integers attached to execution seconds (e.g., "0.1241 s", "2 s")
+            cleaned = re.sub(r'\d+(\.\d+)?\s*ms\b', 'x.x ms', cleaned)
             cleaned = re.sub(r'\d+(\.\d+)?\s*s\b', 'x.x s', cleaned)
             
             # parse metrics like "Total = 10000000" into standard values if they differ
@@ -86,7 +87,8 @@ class BaseNotebookTests(unittest.TestCase):
     kernel_name = None
     notebook_dir = None
     # flag to control sorting behavior dynamically
-    should_sort_parallel_outputs = False 
+    should_sort_parallel_outputs = False
+    skip_gpu_hardware_cells = False
 
     def test_notebooks(self):
         notebook_files = [
@@ -165,6 +167,11 @@ class BaseNotebookTests(unittest.TestCase):
                             # keep standard sequential text formats intact for core c++ notebooks
                             expected_clean = expected_raw.strip()
                             got_clean = got_raw.strip()
+                        if self.skip_gpu_hardware_cells:
+                            gpu_hardware_patterns = ["GPU:", "Streaming Multiprocessors", "Max threads per SM", "Max warps per SM"]
+                            if any(p in expected_clean for p in gpu_hardware_patterns):
+                                print(f"Skipping GPU hardware info cell {i} in {name}")
+                                continue
                         
                         if expected_clean != got_clean:
                             self.fail(
@@ -193,6 +200,7 @@ class CudaNotebookTests(BaseNotebookTests):
     kernel_name = 'xcpp23-cuda'
     notebook_dir = 'cuda'
     should_sort_parallel_outputs = True   # uses parallel filters
+    skip_gpu_hardware_cells = True
 
 
 if __name__ == '__main__':
