@@ -118,7 +118,7 @@ class BaseNotebookTests(unittest.TestCase):
                     inp,
                     out,
                     log_output=True,
-                    kernel_name=self.kernel_name
+                    kernel_name=self.kernel_name,
                     cwd=os.path.dirname(os.path.abspath(inp))
                 )
                 if executed_notebook is None:
