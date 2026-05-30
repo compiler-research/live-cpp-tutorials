@@ -119,6 +119,7 @@ class BaseNotebookTests(unittest.TestCase):
                     out,
                     log_output=True,
                     kernel_name=self.kernel_name
+                    cwd=os.path.dirname(os.path.abspath(inp))
                 )
                 if executed_notebook is None:
                     self.fail(f"Execution of notebook {name} returned None")
