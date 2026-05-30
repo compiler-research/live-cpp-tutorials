@@ -31,8 +31,10 @@ def sanitize_and_sort_output(text):
         elif "counter =" in cleaned:
             cleaned = re.sub(r'counter\s*=\s*\d+', 'counter = x', cleaned)
             cleaned = re.sub(r'lost\s*\d+', 'lost x', cleaned)
-            # catch trailing times inside the same line (e.g., "time = 0.1604 s")
-            cleaned = re.sub(r'\d+\.\d+\s*s', 'x.x s', cleaned)
+
+            # parse milliseconds first, then seconds (order matters)
+            cleaned = re.sub(r'\d+(\.\d+)?\s*ms\b', 'x.x ms', cleaned)
+            cleaned = re.sub(r'\d+(\.\d+)?\s*s\b', 'x.x s', cleaned)
             lines.append(cleaned)
             continue
 
