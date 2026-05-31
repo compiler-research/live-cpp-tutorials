@@ -39,7 +39,7 @@ jobs:
           if-no-files-found: ignore
 
   execute-notebooks-openmp:
-    name: Execute OpenMP notebooks
+    name: OpenMP
     runs-on: ubuntu-latest
     defaults:
       run:
