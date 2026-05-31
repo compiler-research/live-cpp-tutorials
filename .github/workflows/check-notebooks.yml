@@ -7,7 +7,7 @@ on:
 
 jobs:
   execute-notebooks-cpp:
-    name: Execute C++ Notebooks
+    name: C++
     runs-on: ubuntu-latest
     defaults:
       run:
