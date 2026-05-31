@@ -84,7 +84,7 @@ jobs:
           target-host: 192.168.100.30
   
   execute-notebooks-cuda:
-    name: Execute CUDA notebooks
+    name: CUDA
     needs: prepare-dell
     runs-on: [self-hosted, cuda]
     defaults:
