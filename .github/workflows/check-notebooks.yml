@@ -1,0 +1,40 @@
+name: Check C++ Notebooks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  execute-notebooks:
+    name: Execute C++ Notebooks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: List available kernels
+        run: jupyter kernelspec list
+
+      - name: Run C++ Tests via Pytest
+        run: |
+          mkdir -p executed
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py -sv
+
+      - name: Upload executed notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-cpp-notebooks
+          path: executed/
+          if-no-files-found: ignore
