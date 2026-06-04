@@ -29,7 +29,7 @@ To ensure a clean setup, install `live-cpp-tutorials` inside a fresh environment
 Clone the repository and move into the directory:
 
 ```
-git clone --depth=1 [https://github.com/compiler-research/live-cpp-tutorials.git](https://github.com/compiler-research/live-cpp-tutorials.git)
+git clone --depth=1 https://github.com/compiler-research/live-cpp-tutorials.git
 cd live-cpp-tutorials
 ```
 
