@@ -1,4 +1,4 @@
-name: Check C++ Notebooks
+name: CI
 
 on:
   push:
@@ -6,13 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  execute-notebooks:
-    name: Execute C++ Notebooks
+  execute-notebooks-cpp:
+    name: C++
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -el {0}
-        
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,12 +28,97 @@ jobs:
       - name: Run C++ Tests via Pytest
         run: |
           mkdir -p executed
-          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py -sv
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::CppNotebookTests -sv
 
       - name: Upload executed notebooks as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: executed-cpp-notebooks
+          path: executed/
+          if-no-files-found: ignore
+
+  execute-notebooks-openmp:
+    name: OpenMP
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: List available kernels
+        run: jupyter kernelspec list
+
+      - name: Run OpenMP notebook tests
+        run: |
+          mkdir -p executed
+          
+          # Force OpenMP to spawn 8 threads to match your reference .ipynb files
+          export OMP_NUM_THREADS=8
+          
+          LD_PRELOAD="$CONDA_PREFIX/lib/libomp.so" \
+            $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::OpenMPNotebookTests -sv
+
+      - name: Upload executed OpenMP notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-openmp-notebooks
+          path: executed/
+          if-no-files-found: ignore
+
+  prepare-dell:
+    runs-on: [self-hosted, spotter]
+    steps:
+      - uses: compiler-research/ci-workflows/actions/wake-on-lan@main
+        with:
+          mac: a4:bb:6d:51:d5:d2
+          target-host: 192.168.100.30
+  
+  execute-notebooks-cuda:
+    name: CUDA
+    needs: prepare-dell
+    runs-on: [self-hosted, cuda]
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up micromamba environment
+        run: |
+          /root/micromamba-bin/micromamba create -n livecpp-ci -f environment.yml --yes
+          echo "CONDA_PREFIX=/root/.local/share/mamba/envs/livecpp-ci" >> $GITHUB_ENV
+
+      - name: Install CUDA kernel
+        run: |
+          cp -r $CONDA_PREFIX/share/jupyter/kernels/xcpp23 $CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda
+          python3 -c "
+          import json
+          with open('$CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda/kernel.json') as f:
+              k = json.load(f)
+          k['argv'] += ['--cuda', '--cuda-path=$CONDA_PREFIX/targets/x86_64-linux']
+          with open('$CONDA_PREFIX/share/jupyter/kernels/xcpp23-cuda/kernel.json', 'w') as f:
+              json.dump(k, f, indent=2)
+          "
+
+      - name: Run CUDA Tests via Pytest
+        run: |
+          mkdir -p executed
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::CudaNotebookTests -sv
+
+      - name: Upload executed notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-cuda-notebooks
           path: executed/
           if-no-files-found: ignore
