@@ -20,8 +20,28 @@ An introduction to modern C++ through live, interactive examples. Topics include
 ### OpenMP (`openmp/`)
 CPU parallelism using OpenMP pragmas. Covers `#pragma omp parallel`, loop-level parallelism, reductions, and thread synchronization using the OpenMP-enabled `xeus-cpp` kernel. The notebooks guide you step-by-step from foundational concepts like spawning threads and managing shared vs. private data variables, all the way to advanced patterns like task-based parallelism, critical sections, and optimizing performance loops directly in an interactive environment.
 
+### cppjit (`cppjit/`)
+The other direction: a Python kernel with a C++ compiler inside it. `cppjit` carries Clang and LLVM, reads a C++ header
+the way a compiler does, and lets Python call what it finds. Five notebooks from the SC26 tutorial: call a header from
+Python, use the derivative Clad wrote for it, fit a C++ simulator with SciPy on that gradient, fit the Higgs mass on CMS
+open data without ROOT, and calibrate a sixty-line tumour twin. one wheel is the whole setup (the release's `cppjit-*.whl`, Clad inside; see `cppjit/README.md`).
+
 ### CUDA (`cuda/`)
 GPU programming from first principles using CUDA C++. This section explores how to accelerate compute-heavy workloads by utilizing graphics cards. It covers essential GPU architecture concepts, kernel declarations, memory allocation (`cudaMalloc`), host-to-device data transfers, and thread organization across grids and blocks to give you hands-on experience writing raw parallel code optimized for parallel hardware.
+
+## Licences
+
+This repository is Apache-2.0. The cppjit notebooks use [Clad](https://github.com/vgvassilev/clad) (LGPL-3.0) through
+the compiler they run on: the browser kernel and the cppjit wheel of this repository's release carry it inside
+CppInterOp; nothing of Clad is kept here.
+
+## In the browser
+
+The C++ and cppjit series also run with nothing installed, on GitHub Pages:
+https://compiler-research.org/live-cpp-tutorials/ . The kernel is xeus-cpp compiled to WebAssembly (LLVM 23), hosting
+Python through cppjit for the cppjit series, with Clad built in: a C++ cell can call `clad::gradient` and a Python cell
+can do the same through `cppjit.cppdef`. The first visit downloads the compiler once (about 42 MB), after that
+everything runs in the tab. OpenMP and CUDA need the native kernels below. How the site is built: `lite/README-build.md`.
 
 ## Installation
 To ensure a clean setup, install `live-cpp-tutorials` inside a fresh environment using Micromamba. 

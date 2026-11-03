@@ -1,0 +1,82 @@
+From 28edb1330bb27e191966b4d7714c75f074747a38 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 18:22:07 +0000
+Subject: [PATCH 20/22] Follow cppjit's package layout and stage the Clad
+ headers in the wasm kernel
+
+cppjit now assembles its package under <build>/python/cppjit with the
+extension inside it (import cppjit.libcppjit) and no longer ships a
+cppjit_backend directory; preload that one tree. A CppInterOp built with
+Clad adds /include to the interpreter's search path for the Clad runtime
+headers; XEUS_CPP_CLAD_INCLUDE_DIR names the directory whose clad/ is
+preloaded there.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt | 29 +++++++++++++++++++++--------
+ 1 file changed, 21 insertions(+), 8 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e66efb9..51f5f1f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -87,8 +87,10 @@ if(EMSCRIPTEN)
+     # magic imports cppjit from. Has to match the python package installed for
+     # emscripten-wasm32 in CMAKE_PREFIX_PATH.
+     set(XEUS_CPP_WASM_PYTHON_VERSION "3.13" CACHE STRING "Version of the wasm CPython to embed")
+-    set(CPPJIT_SOURCE_DIR "" CACHE PATH "cppjit checkout supplying the python packages and cpyrt headers")
+-    set(CPPJIT_BUILD_DIR "" CACHE PATH "cppjit wasm build directory holding libcppjit.so")
++    set(CPPJIT_SOURCE_DIR "" CACHE PATH "cppjit checkout supplying the cpyrt headers")
++    set(CPPJIT_BUILD_DIR "" CACHE PATH "cppjit wasm build directory; its python/cppjit tree holds the package and libcppjit.so")
++    set(XEUS_CPP_CLAD_INCLUDE_DIR "" CACHE PATH
++        "Directory holding clad/ (the Clad runtime headers), preloaded at /include/clad for a CppInterOp built with Clad")
+ endif()
+ 
+ # Dependencies
+@@ -565,9 +567,10 @@ if(EMSCRIPTEN)
+         PUBLIC "SHELL: --preload-file ${ESCAPED_XEUS_CPP_RESOURCE_DIR}@/${CMAKE_INSTALL_LIBDIR}/clang/${CPPINTEROP_LLVM_VERSION_MAJOR}"
+         PUBLIC "SHELL: --preload-file ${CPPJIT_SOURCE_DIR}/src/cpyrt@/include/cpyrt"
+         PUBLIC "SHELL: --preload-file ${CPPINTEROP_INSTALL_PREFIX}/include/CppInterOp@/include/CppInterOp"
+-        PUBLIC "SHELL: --preload-file ${CPPJIT_BUILD_DIR}/libcppjit.so@/lib/python${XEUS_CPP_WASM_PYTHON_VERSION}/site-packages/libcppjit.so"
+-        PUBLIC "SHELL: --preload-file ${CPPJIT_SOURCE_DIR}/python/cppjit@/lib/python${XEUS_CPP_WASM_PYTHON_VERSION}/site-packages/cppjit"
+-        PUBLIC "SHELL: --preload-file ${CPPJIT_SOURCE_DIR}/python/cppjit_backend@/lib/python${XEUS_CPP_WASM_PYTHON_VERSION}/site-packages/cppjit_backend"
++        # cppjit's build tree assembles the package under python/cppjit with
++        # the extension inside it (import cppjit.libcppjit), the layout the
++        # wheel ships.
++        PUBLIC "SHELL: --preload-file ${CPPJIT_BUILD_DIR}/python/cppjit@/lib/python${XEUS_CPP_WASM_PYTHON_VERSION}/site-packages/cppjit"
+         PUBLIC "SHELL: --preload-file ${XEUS_CPP_WASM_STDLIB_STAGE}@/lib/python${XEUS_CPP_WASM_PYTHON_VERSION}"
+         # The Python C-API headers, at the path sysconfig reports inside the
+         # kernel (`{prefix}/include/python3.x`), so cppjit puts them on the
+@@ -578,6 +581,16 @@ if(EMSCRIPTEN)
+         PUBLIC "SHELL: --preload-file ${CMAKE_PREFIX_PATH}/include/python${XEUS_CPP_WASM_PYTHON_VERSION}@/include/python${XEUS_CPP_WASM_PYTHON_VERSION}"
+         PUBLIC "SHELL: --post-js ${CMAKE_CURRENT_SOURCE_DIR}/wasm_patches/post.js"
+     )
++    # A CppInterOp built with Clad adds /include to the interpreter's search
++    # path for the Clad runtime headers (CLAD_INCLUDE_DIRS in its wasm build);
++    # stage them there.
++    if(XEUS_CPP_CLAD_INCLUDE_DIR)
++        if(NOT EXISTS "${XEUS_CPP_CLAD_INCLUDE_DIR}/clad/Differentiator/Differentiator.h")
++            message(FATAL_ERROR "No clad/Differentiator/Differentiator.h under XEUS_CPP_CLAD_INCLUDE_DIR (${XEUS_CPP_CLAD_INCLUDE_DIR})")
++        endif()
++        target_link_options(xcpp
++            PUBLIC "SHELL: --preload-file ${XEUS_CPP_CLAD_INCLUDE_DIR}/clad@/include/clad")
++    endif()
+     # --preload-file arguments are opaque to CMake, so rebuilding libcppjit.so
+     # on its own leaves xcpp.data holding the previous copy and the kernel
+     # silently keeps running the old code. Name the ones that get rebuilt during
+@@ -588,9 +601,9 @@ if(EMSCRIPTEN)
+     # kernel runs code that no longer exists in the source tree -- a fix can
+     # then appear not to work when it was simply never deployed.
+     set_property(TARGET xcpp APPEND PROPERTY LINK_DEPENDS
+-        "${CPPJIT_BUILD_DIR}/libcppjit.so"
+-        "${CPPJIT_SOURCE_DIR}/python/cppjit/__init__.py"
+-        "${CPPJIT_SOURCE_DIR}/python/cppjit/_cpython_cppjit.py"
++        "${CPPJIT_BUILD_DIR}/python/cppjit/libcppjit.so"
++        "${CPPJIT_BUILD_DIR}/python/cppjit/__init__.py"
++        "${CPPJIT_BUILD_DIR}/python/cppjit/_cpython_cppjit.py"
+         "${CPPJIT_SOURCE_DIR}/src/cpyrt/API.h")
+ endif()
+ # Tests
+-- 
+2.55.0
+

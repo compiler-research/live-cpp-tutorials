@@ -1,0 +1,82 @@
+From 65d4ebfd7915927fd66c9a5d794f9e49c3b1ed94 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Sat, 31 Oct 2026 17:10:56 +0000
+Subject: [PATCH 1/2] Clad plugin: find Clad's runtime headers next to the
+ installed library, and install them
+
+CLAD_INCLUDE_DIRS is the build tree's staging directory; once the library is installed or packaged (a wheel, a
+kernel) that path no longer exists. CreateInterpreter now prefers the configure-time directory when it exists and
+otherwise looks for <prefix>/include/clad relative to the library's own location, the way the Clang resource
+directory is found. The headers are installed with the library under CPPINTEROP_INSTALL.
+
+Verified: a program linked against the installed tree, with the build tree's headers removed, includes
+clad/Differentiator/Differentiator.h and differentiates; without the installed headers it fails as expected.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt                |  6 ++++++
+ lib/CppInterOp/CppInterOp.cpp | 24 +++++++++++++++++++++++-
+ 2 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4154fd5..420ccf9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -629,6 +629,12 @@ if(CPPINTEROP_ENABLE_CLAD)
+   message(STATUS "Clad build type: ${CLAD_BUILD_TYPE}")
+   add_subdirectory(plugins/clad)
+ endif()
++if(CPPINTEROP_ENABLE_CLAD AND CPPINTEROP_INSTALL)
++  # Clad's runtime headers travel with the library: CreateInterpreter finds
++  # them next to it (<prefix>/include/clad) when the build tree is gone.
++  install(DIRECTORY ${CMAKE_BINARY_DIR}/plugins/clad/include/clad
++          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
++endif()
+ add_subdirectory(lib)
+ 
+ configure_file(
+diff --git a/lib/CppInterOp/CppInterOp.cpp b/lib/CppInterOp/CppInterOp.cpp
+index 6082d35..be2e789 100644
+--- a/lib/CppInterOp/CppInterOp.cpp
++++ b/lib/CppInterOp/CppInterOp.cpp
+@@ -5868,6 +5868,28 @@ static bool exec(const char* cmd, std::vector<std::string>& outputs) {
+   return true;
+ }
+ 
++#ifdef CPPINTEROP_ENABLE_CLAD
++// Clad is linked in statically and attaches to the frontend through its own
++// plugin registration; only its runtime headers need to be found. Prefer the
++// configure-time location (the build tree); when the library has been
++// installed or packaged elsewhere, look next to it: <prefix>/lib/<this lib>
++// -> <prefix>/include/clad.
++static std::string CladIncludeDir() {
++  if (llvm::sys::fs::is_directory(CLAD_INCLUDE_DIRS))
++    return CLAD_INCLUDE_DIRS;
++  void* Addr = (void*)(intptr_t)&CladIncludeDir;
++  std::string Lib = llvm::sys::fs::getMainExecutable(/*argv0=*/nullptr, Addr);
++  llvm::SmallString<256> P(
++      llvm::sys::path::parent_path(llvm::sys::path::parent_path(Lib)));
++  llvm::sys::path::append(P, "include");
++  llvm::SmallString<256> Probe(P);
++  llvm::sys::path::append(Probe, "clad", "Differentiator", "Differentiator.h");
++  if (llvm::sys::fs::exists(Probe))
++    return std::string(P.str());
++  return CLAD_INCLUDE_DIRS;
++}
++#endif
++
+ InterpRef CreateInterpreter(const std::vector<const char*>& Args /*={}*/,
+                             const std::vector<const char*>& GpuArgs /*={}*/) {
+   INTEROP_TRACE(Args, GpuArgs);
+@@ -6067,7 +6089,7 @@ InterpRef CreateInterpreter(const std::vector<const char*>& Args /*={}*/,
+   // clad is linked in statically and attaches to the frontend via its
+   // AddAfterMainAction plugin registration; its runtime headers are staged
+   // in the build tree (plugins/clad/include), not on any default path.
+-  I->AddIncludePath(CLAD_INCLUDE_DIRS);
++  I->AddIncludePath(CladIncludeDir().c_str());
+ #endif
+   return INTEROP_RETURN(I);
+ }
+-- 
+2.55.0
+

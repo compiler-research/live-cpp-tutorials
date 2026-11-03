@@ -59,6 +59,9 @@ def sanitize_and_sort_output(text):
         else:
             # parse dynamic speedups like "18.9x" or "6.4x" into "x.xx"
             cleaned = re.sub(r'\d+(\.\d+)?x', 'x.xx', cleaned)
+
+            # optimiser counters depend on the SciPy version: "10 iterations, 17 loss and 16 gradient evaluations"
+            cleaned = re.sub(r'\b\d+ (iterations?|evaluations?|loss and|gradient evaluations?|evals?)\b', r'x \1', cleaned)
             
             # parse floats/integers attached to execution seconds (e.g., "0.1241 s", "2 s")
             cleaned = re.sub(r'\d+(\.\d+)?\s*ms\b', 'x.x ms', cleaned)
@@ -69,6 +72,10 @@ def sanitize_and_sort_output(text):
             
             # general float / timing cleanup fallback
             cleaned = re.sub(r'\d+\.\d+(e\+\d+)?|\d+e\+\d+', 'x.x', cleaned)
+
+            # width-formatted numbers ("{t:7.1f} ms") leave padding that depends on the digit count, so a slower
+            # machine prints "   318.5 ms" where a faster one prints "    17.4 ms": the x.x above keeps the padding
+            cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
             
             # if the line was a table header separator line (e.g., "------------"), 
             # compress it to prevent spaces from altering the alphabetical sort order
@@ -202,6 +209,13 @@ class CudaNotebookTests(BaseNotebookTests):
     notebook_dir = 'cuda'
     should_sort_parallel_outputs = True   # uses parallel filters
     skip_gpu_hardware_cells = True
+
+class CppjitNotebookTests(BaseNotebookTests):
+    __test__ = True
+    kernel_name = 'python3'   # the Python kernel; the C++ is compiled inside it by cppjit
+    notebook_dir = 'cppjit'
+    # timings, speed-ups and fitted values vary by machine: compare the shape of the output, not the digits
+    should_sort_parallel_outputs = True
 
 
 if __name__ == '__main__':

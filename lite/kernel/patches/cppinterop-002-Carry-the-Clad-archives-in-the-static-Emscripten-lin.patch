@@ -1,0 +1,76 @@
+From 448c002f0d5cdb796a819998cc8ce75c5d02707d Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 18:47:27 +0000
+Subject: [PATCH 2/2] Carry the Clad archives in the static Emscripten link
+ interface
+
+Follow-up to 'Enable Clad plugin in WASM' (PR 1167). The shared library
+links cladPlugin and cladDifferentiator whole-archive itself; the static
+Emscripten library leaves that to its consumer, but CppInterOpConfig.cmake
+listed only the LLVM and Clang archives, so an external kernel linked
+without the plugin and nothing registered it. The unit tests do not notice:
+they link the target inside the build tree, where LINK_LIBS propagates.
+
+Put the two archives at the front of the exported link interface and
+install them beside libclangCppInterOp.a. They go in without a
+--whole-archive pair: emcc wraps a MAIN_MODULE=1 or SIDE_MODULE=1 link in
+one --whole-archive of its own and the flags do not nest, so a
+--no-whole-archive in the middle strips every system library after it down
+to the referenced members, and numpy's extension then fails to load for
+want of acosf. A consumer that links without LINKABLE wraps the two
+archives itself.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ lib/CppInterOp/CMakeLists.txt | 15 +++++++++++++++
+ plugins/clad/CMakeLists.txt   |  9 +++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/lib/CppInterOp/CMakeLists.txt b/lib/CppInterOp/CMakeLists.txt
+index eea9adf..8c7512b 100644
+--- a/lib/CppInterOp/CMakeLists.txt
++++ b/lib/CppInterOp/CMakeLists.txt
+@@ -370,6 +370,21 @@ if(EMSCRIPTEN)
+   endfunction()
+ 
+   get_recursive_interface_libs(_cppinterop_interface_libs ${link_libs})
++  if(CPPINTEROP_ENABLE_CLAD)
++    # A shared clangCppInterOp links the plugin archives whole-archive itself;
++    # a static one hands that duty to its consumer, so the link interface has
++    # to carry them, ahead of the LLVM and Clang archives they draw on. The
++    # archives install beside the library (plugins/clad). No --whole-archive
++    # pair here: emcc wraps a MAIN_MODULE=1 / SIDE_MODULE=1 link in one
++    # --whole-archive of its own and the flags do not nest, so a
++    # --no-whole-archive in the middle would strip every system library that
++    # follows down to the referenced members (numpy then fails to load for
++    # want of acosf). A consumer that links without LINKABLE must wrap these
++    # two archives itself so the plugin's static registration survives.
++    list(PREPEND _cppinterop_interface_libs
++      "${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/${CMAKE_STATIC_LIBRARY_PREFIX}cladPlugin${CMAKE_STATIC_LIBRARY_SUFFIX}"
++      "${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/${CMAKE_STATIC_LIBRARY_PREFIX}cladDifferentiator${CMAKE_STATIC_LIBRARY_SUFFIX}")
++  endif()
+   set(CPPINTEROP_CONFIG_INTERFACE_LIBS
+     "INTERFACE_LINK_LIBRARIES \"${_cppinterop_interface_libs}\"" CACHE INTERNAL
+     "Link interface of the static Emscripten clangCppInterOp")
+diff --git a/plugins/clad/CMakeLists.txt b/plugins/clad/CMakeLists.txt
+index 4965514..3d3275a 100644
+--- a/plugins/clad/CMakeLists.txt
++++ b/plugins/clad/CMakeLists.txt
+@@ -125,5 +125,14 @@ foreach (lib cladPlugin cladDifferentiator)
+   add_dependencies(${lib} clad)
+ endforeach()
+ 
++# A static clangCppInterOp (Emscripten) leaves the whole-archive link of the
++# plugin to its consumer; the archives have to be where its CMake config says.
++if(CPPINTEROP_INSTALL AND NOT BUILD_SHARED_LIBS)
++  install(FILES
++    ${_CLAD_LIBRARY_PATH}/${CMAKE_STATIC_LIBRARY_PREFIX}cladPlugin${CMAKE_STATIC_LIBRARY_SUFFIX}
++    ${_CLAD_LIBRARY_PATH}/${CMAKE_STATIC_LIBRARY_PREFIX}cladDifferentiator${CMAKE_STATIC_LIBRARY_SUFFIX}
++    DESTINATION lib${LLVM_LIBDIR_SUFFIX})
++endif()
++
+ set_property(TARGET cladPlugin PROPERTY IMPORTED_LOCATION ${_CLAD_LIBRARY_PATH}/${CMAKE_STATIC_LIBRARY_PREFIX}cladPlugin${CMAKE_STATIC_LIBRARY_SUFFIX})
+ set_property(TARGET cladDifferentiator PROPERTY IMPORTED_LOCATION ${_CLAD_LIBRARY_PATH}/${CMAKE_STATIC_LIBRARY_PREFIX}cladDifferentiator${CMAKE_STATIC_LIBRARY_SUFFIX})
+-- 
+2.55.0
+

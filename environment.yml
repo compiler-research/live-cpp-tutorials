@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nvidia
 dependencies:
-  - python>=3.11
+  - python=3.12.*         # the cppjit wheel of the release is built for 3.12
   - xeus-cpp
   - jupyter
   - nbconvert
@@ -13,3 +13,10 @@ dependencies:
   - cuda-cudart-dev
   - papermill
   - pytest
+  # cppjit series: the Python kernel compiles C++ through cppjit, installed by the workflow from this repository's
+  # release (the wheel carries CppInterOp built with the Clad plugin; the PyPI wheel has no Clad yet)
+  - numpy
+  - scipy
+  - matplotlib-base
+  - ipykernel
+  - pip

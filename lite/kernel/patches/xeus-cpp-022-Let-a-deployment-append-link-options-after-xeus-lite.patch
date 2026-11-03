@@ -1,0 +1,38 @@
+From 7684eb0a89d20dd0879fc0a3d9037837fb9e0f5b Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 20:16:24 +0000
+Subject: [PATCH 22/22] Let a deployment append link options after xeus-lite's
+ wasm defaults
+
+XEUS_CPP_WASM_LINK_OPTIONS is applied after xeus_wasm_link_options, so a
+later -s setting overrides the default: a site that knows which symbols
+its side modules and JIT-compiled code import can link the kernel as
+MAIN_MODULE=2 with a wasm-ld response file of --export-if-defined lines
+and let the linker drop what nothing reaches.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 54813e9..c6ea894 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -524,6 +524,13 @@ if(EMSCRIPTEN)
+     xeus_cpp_set_kernel_options(xcpp)
+     xeus_wasm_compile_options(xcpp)
+     xeus_wasm_link_options(xcpp "web,worker")
++    # Link options a deployment appends after xeus-lite's defaults, so a later
++    # -s setting wins over the default (e.g. -sMAIN_MODULE=2 with an export list
++    # from a wasm-ld response file, in place of MAIN_MODULE=1's export-all).
++    set(XEUS_CPP_WASM_LINK_OPTIONS "" CACHE STRING "Extra link options for the wasm kernel, applied after xeus-lite's")
++    if(XEUS_CPP_WASM_LINK_OPTIONS)
++        target_link_options(xcpp PUBLIC "SHELL:${XEUS_CPP_WASM_LINK_OPTIONS}")
++    endif()
+     # Rung 2 (SC26): link Emscripten's WebGPU binding into the main module so a
+     # JIT'd cell -- a side module resolving against these exports -- can reach
+     # wgpu* through <webgpu/webgpu.h>, which the preloaded sysroot already
+-- 
+2.55.0
+

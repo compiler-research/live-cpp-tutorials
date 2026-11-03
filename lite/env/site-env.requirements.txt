@@ -1,0 +1,10 @@
+# host side of the site build (jupyter lite build + empack), pinned to the 2026-09-20 build environment
+jupyterlite-core==0.8.3
+jupyterlite_xeus==5.0.0
+empack==6.0.1
+jupyterlab==4.6.3
+notebook==7.6.2
+jupyterlab_pygments==0.3.0
+jupyterlab_night==0.5.2
+jupyter_server==2.21.1
+libarchive-c==5.3

@@ -1,0 +1,229 @@
+# From Vipul-Cariappa/jupyterlite-deploy, slimmed for the sc26 home notebooks (see tools/build-lite-site.sh):
+# nlohmann_json's header kept (xcpp::display needs it); openblas/zlib/xz/openssl not packed (shared libraries are fetched by URL,
+# see the build script); fonts, tests and tools the notebooks never touch left out.
+packages:
+  setuptools:
+    exclude_patterns:
+    - pattern: '**/_distutils_hack/**'
+    - pattern: '**/distutils-precedence.pth'
+    - pattern: '**/setuptools/**'
+    - pattern: '**/pkg_resources/_vendor/**'
+  widgetsnbextension:
+    exclude_patterns:
+    - pattern: '**'
+  llvm:
+    exclude_patterns:
+    - pattern: '**'
+  pyjs-dev:
+    exclude_patterns:
+    - pattern: '**'
+  nlohmann_json:
+    exclude_patterns:
+    - pattern: '**/cmake/**'
+    - pattern: '**/pkgconfig/**'
+    - pattern: '**/share/**'
+  nlohmann_json-abi:
+    exclude_patterns:
+    - pattern: '**'
+  cpp-argparse:
+    exclude_patterns:
+    - pattern: '**'
+  pugixml:
+    exclude_patterns:
+    - pattern: '**'
+  doctest:
+    exclude_patterns:
+    - pattern: '**'
+  xtl:
+    exclude_patterns:
+    - pattern: '**'
+  pybind11:
+    exclude_patterns:
+    - pattern: '**'
+  pybind11_json:
+    exclude_patterns:
+    - pattern: '**'
+  emscripten-abi:
+    exclude_patterns:
+    - pattern: '**'
+  python_abi:
+    exclude_patterns:
+    - pattern: '**'
+  pytest:
+    exclude_patterns:
+    - pattern: '**'
+  openblas:
+    exclude_patterns:
+    - pattern: '**'
+  zlib:
+    exclude_patterns:
+    - pattern: '**'
+  xz:
+    exclude_patterns:
+    - pattern: '**'
+  openssl:
+    exclude_patterns:
+    - pattern: '**'
+  matplotlib-base:
+    exclude_patterns:
+    - &id001
+      pattern: bin/**
+    - &id002
+      pattern: '**/bin/**'
+    - &id003
+      pattern: tests/**
+    - &id004
+      pattern: '**/tests/**'
+    - &id005
+      pattern: '**/*.ini'
+    - &id006
+      pattern: '**/*.exe'
+    - &id007
+      pattern: '**/*.c'
+    - &id008
+      pattern: '**/*.pxd'
+    - &id009
+      pattern: '**/*.pyx'
+    - &id010
+      pattern: '**/*.pyc'
+    - &id011
+      pattern: '**/*.typed'
+    - &id012
+      pattern: '**/*.egg-info'
+    - &id013
+      pattern: '**/site-packages/pip/_vendor/**'
+    - &id022
+      pattern: '**/idlelib/**'
+    - &id023
+      pattern: '**/ensurepip/**'
+    - &id014
+      pattern: Scripts/*
+    - &id015
+      pattern: share/jupyter/nbextensions/**
+    - &id016
+      pattern: share/jupyter/labextensions/**
+    - &id017
+      pattern: etc/jupyter/nbconfig/**
+    - &id018
+      pattern: '**/*.a'
+    - &id019
+      pattern: lib/cmake/**
+    - &id020
+      pattern: share/cmake/**
+    - &id021
+      pattern: '**/*.pc'
+    - pattern: '**/mpl-data/fonts/ttf/DejaVuSerif*'
+    - pattern: '**/mpl-data/fonts/ttf/DejaVuSansMono*'
+    - pattern: '**/mpl-data/fonts/ttf/DejaVuSansDisplay*'
+    - pattern: '**/mpl-data/fonts/ttf/STIX*'
+    - pattern: '**/mpl-data/fonts/ttf/cm*.ttf'
+    - pattern: '**/mpl-data/fonts/afm/**'
+    - pattern: '**/mpl-data/fonts/pdfcorefonts/**'
+    - pattern: '**/mpl-data/sample_data/**'
+    - pattern: '**/matplotlib/tests/**'
+    - pattern: '**/mpl_toolkits/*/tests/**'
+  python:
+    exclude_patterns:
+    - *id001
+    - *id002
+    - *id003
+    - *id004
+    - *id005
+    - *id006
+    - *id007
+    - *id008
+    - *id009
+    - *id010
+    - *id011
+    - *id012
+    - *id013
+    - *id014
+    - *id015
+    - *id016
+    - *id017
+    - *id018
+    - *id019
+    - *id020
+    - *id021
+    - pattern: '**/idlelib/**'
+    - pattern: '**/tkinter/**'
+    - pattern: '**/turtledemo/**'
+    - pattern: '**/turtle.py'
+    - pattern: '**/ensurepip/**'
+    - pattern: '**/pydoc_data/**'
+    - pattern: '**/lib/python3.13/test/**'
+  scipy:
+    exclude_patterns:
+    - *id001
+    - *id002
+    - *id003
+    - *id005
+    - *id006
+    - *id007
+    - *id008
+    - *id009
+    - *id010
+    - *id011
+    - *id012
+    - *id013
+    - *id022
+    - *id023
+    - *id014
+    - *id015
+    - *id016
+    - *id017
+    - *id018
+    - *id019
+    - *id020
+    - *id021
+    - pattern: '**/tests/**'
+  numpy:
+    exclude_patterns:
+    - *id001
+    - *id002
+    - *id003
+    - *id005
+    - *id006
+    - *id007
+    - *id008
+    - *id013
+    - *id022
+    - *id023
+    - *id014
+    - *id015
+    - *id016
+    - *id017
+    - *id018
+    - *id019
+    - *id020
+    - *id021
+    - pattern: '**/*.pyx'
+    - pattern: '**/*.pyc'
+    - pattern: '**/*.typed'
+    - pattern: '**/*.egg-info'
+    - pattern: '**/tests/**'
+default:
+  exclude_patterns:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - *id006
+  - *id007
+  - *id008
+  - *id009
+  - *id010
+  - *id011
+  - *id012
+  - *id013
+  - *id022
+  - *id023
+  - *id014
+  - *id015
+  - *id016
+  - *id017
+  - *id018
+  - *id019
+  - *id020
+  - *id021

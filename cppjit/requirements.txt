@@ -1,0 +1,8 @@
+cppjit==0.1.0a1
+numpy
+scipy
+matplotlib
+jupyter
+# optional, notebooks 3 and 4:
+# jax
+# optimistix

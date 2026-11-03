@@ -1,0 +1,14 @@
+{
+ "notebook": "cppjit/4_higgs_open_data.ipynb",
+ "total_bytes": 83568854,
+ "groups": {
+  "app shell, extensions, files": 8211666,
+  "C++ kernel": 37523689,
+  "shared libraries on demand": 2875981,
+  "Python packages at start": 6399573,
+  "lazy packages (first import)": 28557945
+ },
+ "ui_s": 4.211324453353882,
+ "done_s": 40.83511710166931,
+ "done": true
+}

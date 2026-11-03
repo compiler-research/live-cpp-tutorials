@@ -1,0 +1,71 @@
+name: Pages
+# Build the JupyterLite site (the C++ series and the cppjit series running in the browser) and publish it on GitHub Pages.
+# The kernel binaries come from a release of this repository (see lite/kernel/README.md); everything else is rebuilt here.
+on:
+  push:
+    branches: [master]
+    paths: ['cppjit/**', 'xeus-cpp/**', 'lite/**', 'tools/**', '.github/workflows/deploy-pages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+env:
+  KERNEL_RELEASE: kernel-2026-11-03
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Kernel binaries from the release
+        # Under nektos/act (ACT=true) the assets are expected in lite/kernel-artifacts already; see lite/README-build.md.
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p lite/kernel-artifacts
+          gh release download "$KERNEL_RELEASE" --repo "$GITHUB_REPOSITORY" --dir lite/kernel-artifacts \
+            --pattern 'kernel-overlay-*.tar.gz'
+      - name: Verify the kernel binaries against the digests committed in lite/kernel/SHA256SUMS
+        run: (cd lite/kernel-artifacts && sha256sum -c --ignore-missing ../kernel/SHA256SUMS) && ls -la lite/kernel-artifacts
+      - name: Build environment (micromamba, host venv, wasm32 env from the lock, kernel overlay)
+        run: SP="$RUNNER_TEMP/lite" bash tools/setup-lite-env.sh
+      - name: Build the site
+        run: SP="$RUNNER_TEMP/lite" OUT="$PWD/lite/dist" bash tools/build-lite-site.sh
+      - name: The lazy packages are all there
+        run: test "$(ls lite/dist/lazy/*.tar.gz | wc -l)" -eq "$(grep -v '^#' lite/env/lazy-remove.txt | wc -w)"
+      - name: Smoke test in a headless browser (cppjit notebooks 1 and 3, the second one with SciPy, matplotlib and a figure)
+        run: |
+          "$RUNNER_TEMP/lite/site-venv/bin/pip" install -q playwright==1.63.0
+          "$RUNNER_TEMP/lite/site-venv/bin/playwright" install --with-deps chromium
+          # serve one level up so the site sits under /dist/, a sub-path like the Pages URL, not the domain root
+          (cd lite && python3 -m http.server 8942 >/dev/null 2>&1 &)
+          sleep 2
+          for nb in 1_call_it 3_fit_it; do
+            python3 - "$nb" <<'PY'
+          import json, sys; nb = json.load(open(f"lite/content/cppjit/{sys.argv[1]}.ipynb"))
+          json.dump([''.join(c['source']) for c in nb['cells'] if c['cell_type'] == 'code'], open("cells.json", "w"))
+          PY
+            "$RUNNER_TEMP/lite/site-venv/bin/python" tools/lite_run.py --site http://127.0.0.1:8942/dist --cells cells.json --timeout 600 | tee run.log
+            grep -q '"text": "Traceback' run.log && exit 1 || true
+          done
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ !env.ACT }}
+        with:
+          path: lite/dist
+  deploy:
+    needs: build
+    if: ${{ !github.event.act }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

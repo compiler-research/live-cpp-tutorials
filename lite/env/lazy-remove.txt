@@ -1,0 +1,15 @@
+# packages the browser loads on first import (cppjit/kernel/lazy.py), not at kernel start: SciPy, matplotlib, pillow and
+# what only they depend on (dependency closure of the three minus the start-up set, 2026-11-03)
+scipy
+matplotlib-base
+pillow
+contourpy
+cycler
+fonttools
+kiwisolver
+packaging
+pyparsing
+python-dateutil
+python-tzdata
+pytz
+qhull
