@@ -1,0 +1,2 @@
+# kernel specs removed from the derived environments (the overlay ships xcpp23 only; xc23 is listed for a prefix that still has it)
+xc23

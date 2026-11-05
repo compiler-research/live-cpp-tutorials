@@ -1,0 +1,73 @@
+From 4d675494243ad726ae0f0811ca04c46cba956664 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 21:19:18 +0000
+Subject: [PATCH] Leave out of the wasm kernel's preloaded filesystem what a
+ notebook never includes
+
+The sysroot headers and clang's builtin headers were preloaded whole. A
+notebook kernel never includes SDL, GL, X11 or the sanitizer interfaces,
+nor the intrinsics of other architectures (arm_neon.h alone is 3 MB, the
+AVX family 2 MB); together about 16 MB of the 46 MB image. Stage filtered
+copies; the exclude lists are cache variables. The Python standard library
+also drops pydoc_data, ensurepip and venv.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt | 31 +++++++++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c6ea894..b4284b8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -561,9 +561,36 @@ if(EMSCRIPTEN)
+         PATTERN "idlelib" EXCLUDE
+         PATTERN "tkinter" EXCLUDE
+         PATTERN "turtledemo" EXCLUDE
++        PATTERN "pydoc_data" EXCLUDE
++        PATTERN "ensurepip" EXCLUDE
++        PATTERN "venv" EXCLUDE
+         PATTERN "__pycache__" EXCLUDE
+     )
+ 
++    # The sysroot headers and clang's builtin headers are preloaded whole by default; a notebook kernel never includes
++    # the graphics and audio APIs of the former or the other architectures' intrinsics of the latter (arm_neon.h alone
++    # is 3 MB). Stage filtered copies. The lists are cache variables, so a deployment that needs SDL or X86 intrinsics
++    # puts them back.
++    set(XEUS_CPP_WASM_SYSROOT_EXCLUDE "SDL;GL;GLES;GLES2;GLES3;GLFW;EGL;KHR;X11;AL;fakesdl;sanitizer;webgl;uuid" CACHE STRING
++        "Sub-directories of the sysroot include/ left out of the kernel's preloaded filesystem")
++    set(XEUS_CPP_WASM_RESOURCE_EXCLUDE "arm_*;avx*;amx*;*intrin.h;*intrin*.h;altivec.h;opencl-c*.h;hexagon*;hvx*;riscv*;sifive*;velintrin*;ppc_wrappers;larchintrin.h;lsx*;lasx*;__clang_cuda*;__clang_hip*;cuda_wrappers;openmp_wrappers;llvm_libc_wrappers;ptrauth.h;cpuid.h;x86gprintrin.h;keylockerintrin.h;mm_malloc.h;mwaitxintrin.h;s390intrin.h;htmintrin.h;htmxlintrin.h" CACHE STRING
++        "Glob patterns of clang resource-dir headers left out of the kernel's preloaded filesystem")
++    set(XEUS_CPP_WASM_SYSROOT_STAGE "${CMAKE_CURRENT_BINARY_DIR}/wasm_sysroot_include")
++    set(XEUS_CPP_WASM_RESOURCE_STAGE "${CMAKE_CURRENT_BINARY_DIR}/wasm_resource_dir")
++    file(REMOVE_RECURSE "${XEUS_CPP_WASM_SYSROOT_STAGE}" "${XEUS_CPP_WASM_RESOURCE_STAGE}")
++    set(_sysroot_excludes "")
++    foreach(_d IN LISTS XEUS_CPP_WASM_SYSROOT_EXCLUDE)
++        list(APPEND _sysroot_excludes PATTERN "${_d}" EXCLUDE)
++    endforeach()
++    file(COPY "${SYSROOT_PATH}/include/" DESTINATION "${XEUS_CPP_WASM_SYSROOT_STAGE}" ${_sysroot_excludes})
++    set(_resource_excludes "")
++    foreach(_g IN LISTS XEUS_CPP_WASM_RESOURCE_EXCLUDE)
++        list(APPEND _resource_excludes PATTERN "${_g}" EXCLUDE)
++    endforeach()
++    file(COPY "${XEUS_CPP_RESOURCE_DIR}/" DESTINATION "${XEUS_CPP_WASM_RESOURCE_STAGE}" ${_resource_excludes})
++    string(REPLACE "@" "@@" ESCAPED_SYSROOT_STAGE "${XEUS_CPP_WASM_SYSROOT_STAGE}")
++    string(REPLACE "@" "@@" ESCAPED_RESOURCE_STAGE "${XEUS_CPP_WASM_RESOURCE_STAGE}")
++
+     # Clang's own API headers, for a notebook that means to #include clang. They
+     # are 32MB of xcpp.data, so a deployment that only runs C++ leaves them out.
+     option(XEUS_CPP_WASM_PRELOAD_CLANG_HEADERS
+@@ -576,8 +603,8 @@ if(EMSCRIPTEN)
+     endif()
+ 
+     target_link_options(xcpp
+-        PUBLIC "SHELL: --preload-file ${ESCAPED_SYSROOT_PATH}/include@/include"
+-        PUBLIC "SHELL: --preload-file ${ESCAPED_XEUS_CPP_RESOURCE_DIR}@/${CMAKE_INSTALL_LIBDIR}/clang/${CPPINTEROP_LLVM_VERSION_MAJOR}"
++        PUBLIC "SHELL: --preload-file ${ESCAPED_SYSROOT_STAGE}@/include"
++        PUBLIC "SHELL: --preload-file ${ESCAPED_RESOURCE_STAGE}@/${CMAKE_INSTALL_LIBDIR}/clang/${CPPINTEROP_LLVM_VERSION_MAJOR}"
+         PUBLIC "SHELL: --preload-file ${CPPJIT_SOURCE_DIR}/src/cpyrt@/include/cpyrt"
+         PUBLIC "SHELL: --preload-file ${CPPINTEROP_INSTALL_PREFIX}/include/CppInterOp@/include/CppInterOp"
+         # cppjit's build tree assembles the package under python/cppjit with
+-- 
+2.55.0
+

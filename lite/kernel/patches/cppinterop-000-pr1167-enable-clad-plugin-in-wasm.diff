@@ -1,0 +1,209 @@
+diff --git a/.github/actions/Build_and_Test_CppInterOp/action.yml b/.github/actions/Build_and_Test_CppInterOp/action.yml
+index e603f791c..339a5a845 100644
+--- a/.github/actions/Build_and_Test_CppInterOp/action.yml
++++ b/.github/actions/Build_and_Test_CppInterOp/action.yml
+@@ -312,6 +312,15 @@ runs:
+         echo "CPPINTEROP_TBLGEN_EXE=$CPPINTEROP_TBLGEN_EXE" >> $GITHUB_ENV
+         popd
+ 
++        # clad-tblgen renders clad's option tables and cannot run in the cross build.
++        CLAD_TAG=$(sed -n 's/.*GIT_TAG \(.*\))$/\1/p' plugins/clad/CMakeLists.txt)
++        git clone --depth 1 --branch "$CLAD_TAG" https://github.com/vgvassilev/clad.git clad-src
++        CLAD_SOURCE_DIR=$PWD/clad-src
++        cmake -G Ninja -S $CLAD_SOURCE_DIR/utils/clad-tblgen -B clad_tblgen_build \
++              -DLLVM_DIR=$NATIVE_LLVM_BUILD_DIR/lib/cmake/llvm
++        cmake --build clad_tblgen_build --target clad-tblgen
++        CLAD_TBLGEN_EXE=$PWD/clad_tblgen_build/clad-tblgen
++
+         # Build CppInterOp next to cling and llvm-project.
+         # See native-shared site above re: stale build/ on local repro.
+         rm -rf build
+@@ -333,6 +342,9 @@ runs:
+                 -DLLVM_ENABLE_WERROR=On                      \
+                 -DSYSROOT_PATH=$SYSROOT_PATH               \
+                 -DCPPINTEROP_TABLEGEN_EXE=$CPPINTEROP_TBLGEN_EXE \
++                -DCPPINTEROP_ENABLE_CLAD=ON \
++                -DCLAD_SOURCE_DIR=$CLAD_SOURCE_DIR \
++                -DCLAD_TABLEGEN_EXE=$CLAD_TBLGEN_EXE \
+                 ../
+         else
+           emcmake cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}    \
+@@ -347,6 +359,9 @@ runs:
+                 -DLLVM_ENABLE_WERROR=On                      \
+                 -DSYSROOT_PATH=$SYSROOT_PATH                     \
+                 -DCPPINTEROP_TABLEGEN_EXE=$CPPINTEROP_TBLGEN_EXE \
++                -DCPPINTEROP_ENABLE_CLAD=ON \
++                -DCLAD_SOURCE_DIR=$CLAD_SOURCE_DIR \
++                -DCLAD_TABLEGEN_EXE=$CLAD_TBLGEN_EXE \
+                 ../
+         fi
+         emmake ninja check-cppinterop
+@@ -592,6 +607,15 @@ runs:
+         echo "CPPINTEROP_TBLGEN_EXE=$env:CPPINTEROP_TBLGEN_EXE" >> $env:GITHUB_ENV
+         popd
+ 
++        # clad-tblgen renders clad's option tables and cannot run in the cross build.
++        $env:CLAD_TAG=(Select-String -Path plugins\clad\CMakeLists.txt -Pattern 'GIT_TAG (\S+)\)').Matches[0].Groups[1].Value
++        git clone --depth 1 --branch $env:CLAD_TAG https://github.com/vgvassilev/clad.git clad-src
++        $env:CLAD_SOURCE_DIR="$env:PWD_DIR/clad-src"
++        cmake -G Ninja -S "$env:CLAD_SOURCE_DIR/utils/clad-tblgen" -B clad_tblgen_build `
++              -DLLVM_DIR="$env:NATIVE_LLVM_BUILD_DIR\lib\cmake\llvm"
++        cmake --build clad_tblgen_build --target clad-tblgen
++        $env:CLAD_TBLGEN_EXE = (Get-ChildItem -Path clad_tblgen_build -Recurse -Filter "clad-tblgen.exe" | Select-Object -First 1).FullName
++
+         # Build CppInterOp next to cling and llvm-project.
+         # See bash sites above re: stale build/ on local repro paths.
+         # -G Ninja: emcmake's default on Windows is MinGW Makefiles, whose
+@@ -617,6 +641,9 @@ runs:
+                 -DLLVM_ENABLE_WERROR=On                      `
+                 -DSYSROOT_PATH="$env:SYSROOT_PATH"              `
+                 -DCPPINTEROP_TABLEGEN_EXE="$env:CPPINTEROP_TBLGEN_EXE" `
++                -DCPPINTEROP_ENABLE_CLAD=ON `
++                -DCLAD_SOURCE_DIR="$env:CLAD_SOURCE_DIR" `
++                -DCLAD_TABLEGEN_EXE="$env:CLAD_TBLGEN_EXE" `
+                 ..\
+         }
+         else
+@@ -633,6 +660,9 @@ runs:
+                 -DLLVM_ENABLE_WERROR=On                      `
+                 -DSYSROOT_PATH="$env:SYSROOT_PATH"                     `
+                 -DCPPINTEROP_TABLEGEN_EXE="$env:CPPINTEROP_TBLGEN_EXE" `
++                -DCPPINTEROP_ENABLE_CLAD=ON `
++                -DCLAD_SOURCE_DIR="$env:CLAD_SOURCE_DIR" `
++                -DCLAD_TABLEGEN_EXE="$env:CLAD_TBLGEN_EXE" `
+                 ..\
+         }
+         function Error-OnFailure {
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 15105584d..4154fd5a5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -34,9 +34,6 @@ endif()
+ # Clad plugin options
+ option(CPPINTEROP_ENABLE_CLAD "Enable the Clad automatic differentiation plugin." OFF)
+ set(CLAD_BUILD_TYPE "Release" CACHE STRING "Build type for clad plugins")
+-if(EMSCRIPTEN AND CPPINTEROP_ENABLE_CLAD)
+-  message(FATAL_ERROR "CPPINTEROP_ENABLE_CLAD is not supported for Emscripten builds yet.")
+-endif()
+ 
+ if (CPPINTEROP_USE_CLING AND CPPINTEROP_USE_REPL)
+ message(FATAL_ERROR "We can only use Cling (${CPPINTEROP_USE_CLING}=On) or Repl (CPPINTEROP_USE_REPL=On), but not both of them.")
+diff --git a/lib/CppInterOp/CMakeLists.txt b/lib/CppInterOp/CMakeLists.txt
+index f5e6d1879..eea9adf8a 100644
+--- a/lib/CppInterOp/CMakeLists.txt
++++ b/lib/CppInterOp/CMakeLists.txt
+@@ -423,9 +423,15 @@ set_source_files_properties(CppInterOp.cpp PROPERTIES COMPILE_DEFINITIONS
+ )
+ 
+ if(CPPINTEROP_ENABLE_CLAD)
++  if(EMSCRIPTEN)
++    # Wasm consumers stage the clad headers at /include in the Emscripten VFS.
++    set(_clad_runtime_include_dir "/include")
++  else()
++    set(_clad_runtime_include_dir "${CMAKE_BINARY_DIR}/plugins/clad/include/")
++  endif()
+   set_property(SOURCE CppInterOp.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+     "CPPINTEROP_ENABLE_CLAD=1"
+-    "CLAD_INCLUDE_DIRS=\"${CMAKE_BINARY_DIR}/plugins/clad/include/\""
++    "CLAD_INCLUDE_DIRS=\"${_clad_runtime_include_dir}\""
+   )
+ endif()
+ 
+diff --git a/plugins/clad/CMakeLists.txt b/plugins/clad/CMakeLists.txt
+index ad3839eb5..3bef5edaf 100644
+--- a/plugins/clad/CMakeLists.txt
++++ b/plugins/clad/CMakeLists.txt
+@@ -58,25 +58,50 @@ set(_clad_extra_settings
+ if (DEFINED CLAD_SOURCE_DIR)
+   message(STATUS "Using local clad source directory: ${CLAD_SOURCE_DIR}")
+   list(APPEND _clad_extra_settings SOURCE_DIR ${CLAD_SOURCE_DIR})
++  set(_clad_source_dir ${CLAD_SOURCE_DIR})
+ else()
+   list(APPEND _clad_extra_settings GIT_REPOSITORY https://github.com/vgvassilev/clad.git)
+   list(APPEND _clad_extra_settings GIT_TAG v2.5)
++  set(_clad_source_dir ${CMAKE_CURRENT_BINARY_DIR}/clad-prefix/src/clad)
++endif()
++
++set(_clad_cmake_args
++  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
++  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
++  -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
++  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
++  -DCMAKE_CXX_FLAGS=${CLAD_CXX_FLAGS}
++  -DCMAKE_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}
++  -DCMAKE_INSTALL_PREFIX=${clad_install_dir}
++  -DLLVM_DIR=${LLVM_DIR}
++  -DClang_DIR=${CLANG_CMAKE_DIR}
++  ${_clad_extra_cmake_args}
++)
++
++if(EMSCRIPTEN)
++  # clad renders its option and analysis tables with clad-tblgen, which a wasm
++  # build cannot run. Same contract as CPPINTEROP_TABLEGEN_EXE: hand the cross
++  # build a host tool, configured from clad's utils/clad-tblgen.
++  if(NOT CLAD_TABLEGEN_EXE)
++    message(FATAL_ERROR "Cross-compiling clad needs a native clad-tblgen: set "
++      "CLAD_TABLEGEN_EXE to one configured from clad's utils/clad-tblgen.")
++  endif()
++  list(APPEND _clad_cmake_args -DCLAD_TBLGEN=${CLAD_TABLEGEN_EXE})
++  # The emscripten clangInterpreter links lldWasm; clad must find LLD before Clang.
++  set(_clad_configure
++    CONFIGURE_COMMAND emcmake${EMCC_SUFFIX} cmake -G ${CMAKE_GENERATOR}
++      -S ${_clad_source_dir}
++      -B ${CMAKE_CURRENT_BINARY_DIR}/clad-prefix/src/clad-build
++      -DLLD_DIR=${LLD_DIR}
++      ${_clad_cmake_args})
++else()
++  set(_clad_configure CMAKE_ARGS -G ${CMAKE_GENERATOR} ${_clad_cmake_args})
+ endif()
+ 
+ ExternalProject_Add(
+   clad
+   UPDATE_COMMAND ""
+-  CMAKE_ARGS -G ${CMAKE_GENERATOR}
+-             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+-             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+-             -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+-             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+-             -DCMAKE_CXX_FLAGS=${CLAD_CXX_FLAGS}
+-             -DCMAKE_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}
+-             -DCMAKE_INSTALL_PREFIX=${clad_install_dir}
+-             -DLLVM_DIR=${LLVM_DIR}
+-             -DClang_DIR=${CLANG_CMAKE_DIR}
+-             ${_clad_extra_cmake_args}
++  ${_clad_configure}
+   BUILD_COMMAND ${CMAKE_COMMAND} --build . ${EXTRA_BUILD_ARGS} --parallel
+   INSTALL_COMMAND ${CMAKE_COMMAND} --build . ${EXTRA_BUILD_ARGS} --target install
+   BUILD_BYPRODUCTS ${CLAD_BYPRODUCTS}
+diff --git a/unittests/CppInterOp/CMakeLists.txt b/unittests/CppInterOp/CMakeLists.txt
+index d86419207..c40a795c3 100644
+--- a/unittests/CppInterOp/CMakeLists.txt
++++ b/unittests/CppInterOp/CMakeLists.txt
+@@ -36,6 +36,12 @@ if (EMSCRIPTEN)
+     "SHELL:--preload-file ${ESCAPED_SYSROOT_PATH}/include@/include"
+     "SHELL:--emrun"
+   )
++  if (CPPINTEROP_ENABLE_CLAD)
++    string(REPLACE "@" "@@" ESCAPED_CLAD_INCLUDE_PATH "${CMAKE_BINARY_DIR}/plugins/clad/include")
++    list(APPEND CPPINTEROP_COMMON_WASM_TEST_LINK_FLAGS
++      "SHELL:--preload-file ${ESCAPED_CLAD_INCLUDE_PATH}@/include"
++    )
++  endif()
+ endif()
+ 
+ add_cppinterop_unittest(CppInterOpTests
+diff --git a/unittests/CppInterOp/CladTest.cpp b/unittests/CppInterOp/CladTest.cpp
+index 4e3efd24d..36ce16c04 100644
+--- a/unittests/CppInterOp/CladTest.cpp
++++ b/unittests/CppInterOp/CladTest.cpp
+@@ -9,7 +9,9 @@
+ using namespace TestUtils;
+ 
+ TYPED_TEST(CPPINTEROP_TEST_MODE, CladTest_Sanity) {
+-  Cpp::CreateInterpreter({"-std=c++17"}, {});
++  // clad headers reach libc++ locale internals under the sysroot compat dir.
++  Cpp::CreateInterpreter(
++      {"-std=c++17", "-Xclang", "-iwithsysroot/include/compat"}, {});
+ 
+   std::string code = R"(
+     #include "clad/Differentiator/Differentiator.h"

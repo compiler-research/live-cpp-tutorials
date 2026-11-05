@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Sun, 20 Sep 2026 08:32:00 +0000
+Subject: [PATCH] Link WebGPU into the wasm kernel and hand a device over from
+ post.js
+
+A cell compiled in the browser is a side module that resolves against the
+kernel's exports, and this main module exports everything it links. It links
+WebGL today and no WebGPU, so wgpu* is unreachable from any cell even though
+<webgpu/webgpu.h> is already in the preloaded sysroot.
+
+Add -sUSE_WEBGPU=1 to the xcpp link -- the legacy library_webgpu.js that
+emsdk 4.0.9 ships; the emdawnwebgpu port would need a newer emsdk and move
+emscripten-abi for the whole environment -- and request adapter and device in
+post.js, in the kernel's worker, storing the device where
+emscripten_webgpu_get_device() looks for it. Module.webgpuReady lets a cell
+tell "no WebGPU here" from "not ready yet".
+
+WGSL is f32-only. Untested at runtime from the authoring machine, which has no
+navigator.gpu; see the SC26 tree's act3/webgpu_logistic.cpp for the cell.
+---
+ CMakeLists.txt       | 10 ++++++++++
+ wasm_patches/post.js | 38 +++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 47 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 47e3af2..e66efb9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -516,6 +516,16 @@ if(EMSCRIPTEN)
+     xeus_cpp_set_kernel_options(xcpp)
+     xeus_wasm_compile_options(xcpp)
+     xeus_wasm_link_options(xcpp "web,worker")
++    # Rung 2 (SC26): link Emscripten's WebGPU binding into the main module so a
++    # JIT'd cell -- a side module resolving against these exports -- can reach
++    # wgpu* through <webgpu/webgpu.h>, which the preloaded sysroot already
++    # carries. On emsdk 4.0.9 this is the legacy library_webgpu.js; the
++    # emdawnwebgpu port needs a newer emsdk and would move emscripten-abi for
++    # the whole environment. The device is handed over from post.js.
++    target_link_options(xcpp PUBLIC "SHELL: -sUSE_WEBGPU=1")
++    # post.js is a link input (--post-js); without this, editing it does not
++    # relink and a rebuilt kernel silently ships the old glue.
++    set_property(TARGET xcpp APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/wasm_patches/post.js")
+     string(REPLACE "@" "@@" ESCAPED_SYSROOT_PATH "${SYSROOT_PATH}")
+     string(REPLACE "@" "@@" ESCAPED_XEUS_CPP_RESOURCE_DIR "${XEUS_CPP_RESOURCE_DIR}")
+     string(REPLACE "\\" "/" ESCAPED_XEUS_CPP_RESOURCE_DIR "${ESCAPED_XEUS_CPP_RESOURCE_DIR}")
+diff --git a/wasm_patches/post.js b/wasm_patches/post.js
+index 8c0acd1..529bf13 100644
+--- a/wasm_patches/post.js
++++ b/wasm_patches/post.js
+@@ -9,4 +9,40 @@ Module.getDylinkMetadata = getDylinkMetadata
+ Module.loadDynamicLibrary = loadDynamicLibrary
+ 
+ Module.UTF8ToString = UTF8ToString;
+-Module.ERRNO_CODES = ERRNO_CODES;
+\ No newline at end of file
++Module.ERRNO_CODES = ERRNO_CODES;
++
++// WebGPU device hand-off for library_webgpu.js (emsdk 4.0.9). The C++ side
++// calls emscripten_webgpu_get_device(), which returns whatever is stored in
++// Module.preinitializedWebGPUDevice -- so request adapter and device here, in
++// the kernel's worker, before any cell can ask. Module.webgpuReady resolves to
++// true when a device is available and false when this browser has no WebGPU;
++// a cell that runs before it settles gets a null device and should say so.
++Module.preinitializedWebGPUDevice = null;
++// library_webgpu.js's emscripten_webgpu_get_device() dereferences the
++// pre-initialised device without checking it, so on a browser without WebGPU
++// the exception escapes the JIT'd cell and the kernel hangs. A cell compiled in
++// the browser is a side module that resolves JS-library imports through
++// wasmImports, and post.js runs before any cell can be compiled -- so guard the
++// import here: no device, no handle (0), and C++ can say "no WebGPU device".
++if (typeof wasmImports !== 'undefined' && wasmImports.emscripten_webgpu_get_device) {
++  const _getDevice = wasmImports.emscripten_webgpu_get_device;
++  wasmImports.emscripten_webgpu_get_device = () => Module.preinitializedWebGPUDevice ? _getDevice() : 0;
++}
++// The reason is recorded where a C++ cell can read it (MEMFS) and in the console,
++// so "no device" can be told apart: no-navigator-gpu / no-adapter / error / pending.
++const _webgpuStatus = (s) => { Module.webgpuStatus = s; try { FS.writeFile('/tmp/webgpu-status.txt', s); } catch (e) {} console.warn('[webgpu] ' + s); };
++_webgpuStatus('pending');
++Module.webgpuReady = (async () => {
++  try {
++    if (typeof navigator === 'undefined' || !navigator.gpu) { _webgpuStatus('no-navigator-gpu (no WebGPU in this worker, or not a secure context)'); return false; }
++    const adapter = await navigator.gpu.requestAdapter();
++    if (!adapter) { _webgpuStatus('no-adapter (requestAdapter() returned null: GPU blocklisted or unsupported)'); return false; }
++    Module.preinitializedWebGPUDevice = await adapter.requestDevice();
++    const info = adapter.info || {};
++    _webgpuStatus('ok (' + [info.vendor, info.architecture, info.description].filter(Boolean).join(' / ') + ')');
++    return true;
++  } catch (e) {
++    _webgpuStatus('error: ' + e);
++    return false;
++  }
++})();

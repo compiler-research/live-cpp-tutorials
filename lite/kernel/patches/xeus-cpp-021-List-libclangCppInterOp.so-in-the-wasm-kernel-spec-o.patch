@@ -1,0 +1,96 @@
+From 0bfe4f074ab623d4a570ddc28b62ad473c6a132c Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 18:56:10 +0000
+Subject: [PATCH 21/22] List libclangCppInterOp.so in the wasm kernel spec only
+ when it is a shared library
+
+jupyterlite-xeus copies every entry of metadata.shared out of the prefix;
+with CppInterOp built static (the Emscripten line since CppInterOp #1149)
+the file does not exist and the site build fails. Emit the entry from the
+CppInterOp config's CPPINTEROP_SHARED_LIB.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt                                   | 6 ++++++
+ share/jupyter/kernels/xc23/wasm_kernel.json.in   | 3 +--
+ share/jupyter/kernels/xcpp17/wasm_kernel.json.in | 3 +--
+ share/jupyter/kernels/xcpp20/wasm_kernel.json.in | 3 +--
+ share/jupyter/kernels/xcpp23/wasm_kernel.json.in | 3 +--
+ 5 files changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 51f5f1f..54813e9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -143,6 +143,12 @@ function(configure_kernel kernel)
+     foreach(arg IN LISTS XEUS_CPP_WASM_KERNEL_EXTRA_ARGS)
+         string(APPEND XEUS_CPP_WASM_KERNEL_EXTRA_ARGS_JSON "\"${arg}\", ")
+     endforeach()
++    # The side modules the loader serves next to the kernel. A CppInterOp built
++    # as a static library is inside xcpp.wasm and has no file to list.
++    set(XEUS_CPP_WASM_SHARED_JSON "\"libxeus.so\": \"lib/libxeus.so\"")
++    if(CPPINTEROP_SHARED_LIB)
++        string(APPEND XEUS_CPP_WASM_SHARED_JSON ",\n      \"libclangCppInterOp.so\": \"lib/libclangCppInterOp.so\"")
++    endif()
+   else()
+     set(XEUS_CPP_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include)
+     if(${kernel} MATCHES "omp/$")
+diff --git a/share/jupyter/kernels/xc23/wasm_kernel.json.in b/share/jupyter/kernels/xc23/wasm_kernel.json.in
+index 7dd2bd3..0a83e04 100644
+--- a/share/jupyter/kernels/xc23/wasm_kernel.json.in
++++ b/share/jupyter/kernels/xc23/wasm_kernel.json.in
+@@ -13,8 +13,7 @@
+   "metadata": {
+     "debugger": false,
+     "shared": {
+-      "libxeus.so": "lib/libxeus.so",
+-      "libclangCppInterOp.so": "lib/libclangCppInterOp.so"
++      @XEUS_CPP_WASM_SHARED_JSON@
+     }
+   }
+ }
+diff --git a/share/jupyter/kernels/xcpp17/wasm_kernel.json.in b/share/jupyter/kernels/xcpp17/wasm_kernel.json.in
+index 02ec059..7b98fbd 100644
+--- a/share/jupyter/kernels/xcpp17/wasm_kernel.json.in
++++ b/share/jupyter/kernels/xcpp17/wasm_kernel.json.in
+@@ -12,8 +12,7 @@
+   "metadata": {
+     "debugger": false,
+     "shared": {
+-      "libxeus.so": "lib/libxeus.so",
+-      "libclangCppInterOp.so": "lib/libclangCppInterOp.so"
++      @XEUS_CPP_WASM_SHARED_JSON@
+     }
+   }
+ }
+diff --git a/share/jupyter/kernels/xcpp20/wasm_kernel.json.in b/share/jupyter/kernels/xcpp20/wasm_kernel.json.in
+index 015bd5a..d49f91e 100644
+--- a/share/jupyter/kernels/xcpp20/wasm_kernel.json.in
++++ b/share/jupyter/kernels/xcpp20/wasm_kernel.json.in
+@@ -12,8 +12,7 @@
+   "metadata": {
+     "debugger": false,
+     "shared": {
+-      "libxeus.so": "lib/libxeus.so",
+-      "libclangCppInterOp.so": "lib/libclangCppInterOp.so"
++      @XEUS_CPP_WASM_SHARED_JSON@
+     }
+   }
+ }
+diff --git a/share/jupyter/kernels/xcpp23/wasm_kernel.json.in b/share/jupyter/kernels/xcpp23/wasm_kernel.json.in
+index 2de544f..510fd63 100644
+--- a/share/jupyter/kernels/xcpp23/wasm_kernel.json.in
++++ b/share/jupyter/kernels/xcpp23/wasm_kernel.json.in
+@@ -12,8 +12,7 @@
+   "metadata": {
+     "debugger": false,
+     "shared": {
+-      "libxeus.so": "lib/libxeus.so",
+-      "libclangCppInterOp.so": "lib/libclangCppInterOp.so"
++      @XEUS_CPP_WASM_SHARED_JSON@
+     }
+   }
+ }
+-- 
+2.55.0
+

@@ -1,0 +1,25 @@
+{
+ "scipy": [
+  "scipy"
+ ],
+ "matplotlib": [
+  "matplotlib-base",
+  "pillow",
+  "fonttools",
+  "contourpy",
+  "cycler",
+  "kiwisolver",
+  "pyparsing",
+  "python-dateutil",
+  "python-tzdata",
+  "pytz",
+  "packaging",
+  "qhull"
+ ],
+ "PIL": [
+  "pillow"
+ ],
+ "fontTools": [
+  "fonttools"
+ ]
+}

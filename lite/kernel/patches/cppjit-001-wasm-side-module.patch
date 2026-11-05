@@ -1,0 +1,162 @@
+From efeed25acd988e5db0282a434f41ea10482a10c4 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 18:21:22 +0000
+Subject: [PATCH] Build libcppjit as a wasm side module against an external
+ CppInterOp
+
+A cross build to emscripten cannot satisfy three host assumptions. Python:
+find_package(Python ... Development.Module) resolves the host interpreter,
+whose headers are the wrong architecture; take the headers from the wasm
+CPython in the emscripten prefix and link no libpython -- a side module
+leaves the CPython symbols for the embedding main module to resolve.
+Target: emscripten's CMake platform module declares no shared-library
+support, so a SHARED target would quietly become static; libcppjit.so is a
+SIDE_MODULE with the exception model CppInterOp and the kernel use. Paths:
+inside the kernel the CppInterOp library is the name the main module
+records its dependency under, and the headers are where the kernel preloaded
+them, not host paths of the configure-time prefix.
+
+The external-CppInterOp path (CppInterOp_DIR / CMAKE_PREFIX_PATH) already
+exists; this reuses it and only replaces the baked runtime coordinates.
+Under emscripten the libstdc++ lookup is skipped: the standard library is
+libc++ linked into the hosting module, and the name would resolve to a 404
+page the loader then rejects.
+
+Rewrites Vipul Cariappa's patches 001, 002, 004 (August 2026, cppjit 5a33027)
+over the restructured CppInterOp acquisition on main.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ CMakeLists.txt                  | 81 +++++++++++++++++++++++++++++----
+ src/interop/interop_wrapper.cxx |  6 +++
+ 2 files changed, 79 insertions(+), 8 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 62b656f..fe19000 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -15,16 +15,49 @@ set(CPPINTEROP_GIT_TAG "d3c8cf7aff7796e1539582f8e52910f351a48977" CACHE STRING "
+ set(CPPINTEROP_SOURCE_DIR "" CACHE PATH
+     "Override default CppInterOp built by ExternalProject_Add, with a path to local CppInterOp source")
+ 
+-# The full Development component requires libpython, which manylinux
+-# images do not ship and extension modules do not need.
+-set(Python_FIND_VIRTUALENV ONLY)
+-find_package(Python COMPONENTS Interpreter Development.Module)
+-if(NOT Python_FOUND)
++if(EMSCRIPTEN)
++    # Cross-compiling: the host interpreter only answers cmake-time queries.
++    # The headers to compile against are the wasm CPython's in the emscripten
++    # prefix, and a side module links no libpython at all -- the CPython
++    # symbols stay undefined for the main module that embeds the interpreter.
+     set(Python_FIND_VIRTUALENV STANDARD)
++    find_package(Python COMPONENTS Interpreter REQUIRED)
++    set(CPPJIT_WASM_PYTHON_INCLUDE_DIR "" CACHE PATH
++        "Include directory of the wasm CPython to compile against; searched under CMAKE_PREFIX_PATH when empty")
++    if(NOT CPPJIT_WASM_PYTHON_INCLUDE_DIR)
++        foreach(_prefix IN LISTS CMAKE_PREFIX_PATH CMAKE_SYSTEM_PREFIX_PATH)
++            file(GLOB _candidates "${_prefix}/include/python3.*")
++            foreach(_candidate IN LISTS _candidates)
++                if(EXISTS "${_candidate}/Python.h")
++                    set(CPPJIT_WASM_PYTHON_INCLUDE_DIR "${_candidate}")
++                    break()
++                endif()
++            endforeach()
++            if(CPPJIT_WASM_PYTHON_INCLUDE_DIR)
++                break()
++            endif()
++        endforeach()
++    endif()
++    if(NOT CPPJIT_WASM_PYTHON_INCLUDE_DIR)
++        message(FATAL_ERROR
++            "No wasm CPython headers found. Install a python package for "
++            "emscripten-wasm32 into the prefix on CMAKE_PREFIX_PATH, or pass "
++            "-DCPPJIT_WASM_PYTHON_INCLUDE_DIR=<prefix>/include/python3.x")
++    endif()
++    message(STATUS "Wasm CPython headers: ${CPPJIT_WASM_PYTHON_INCLUDE_DIR}")
++    set(Python_INCLUDE_DIRS "${CPPJIT_WASM_PYTHON_INCLUDE_DIR}")
++else()
++    # The full Development component requires libpython, which manylinux
++    # images do not ship and extension modules do not need.
++    set(Python_FIND_VIRTUALENV ONLY)
+     find_package(Python COMPONENTS Interpreter Development.Module)
+-endif()
+-if(NOT Python_Development.Module_FOUND)
+-    message(FATAL_ERROR "Python development headers not found")
++    if(NOT Python_FOUND)
++        set(Python_FIND_VIRTUALENV STANDARD)
++        find_package(Python COMPONENTS Interpreter Development.Module)
++    endif()
++    if(NOT Python_Development.Module_FOUND)
++        message(FATAL_ERROR "Python development headers not found")
++    endif()
+ endif()
+ 
+ # The LLVM range the pinned CppInterOp supports. Update it with the tag.
+@@ -55,6 +88,26 @@ set(CPPINTEROP_STAGE_DIR "${CMAKE_BINARY_DIR}/interop")
+ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AddCppInterOp.cmake)
+ cppjit_add_cppinterop()
+ 
++if(EMSCRIPTEN)
++    # Inside the kernel the coordinates are virtual-filesystem paths, not the
++    # host paths of the prefix cppjit was configured against. The library is
++    # named the way the kernel's main module records its dependency, so dlopen
++    # hands back that module instead of loading a second copy of CppInterOp
++    # (and with it a second interpreter); the headers live where the kernel
++    # preloaded them. No anchor: an empty prefix leaves the names bare.
++    if(NOT TARGET CppInterOp)
++        set(CPPINTEROP_INSTALL_PREFIX "")
++        set(CPPJIT_INTEROP_LIBRARY "libclangCppInterOp.so" CACHE STRING
++            "Library name cppjit dlopens CppInterOp through inside the wasm kernel")
++        set(CPPJIT_INTEROP_RUNTIME_INCLUDES "/include" CACHE STRING
++            "Include directories (':'-joined) cppjit hands the interpreter inside the wasm kernel")
++        set(CPPJIT_INTEROP_CLANG_DIR "")
++    endif()
++    # The emscripten CMake platform module declares no shared-library support,
++    # so a SHARED target would silently become static.
++    set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
++endif()
++
+ # this libcppjit.so merges both cpyrt and the interop wrapper
+ file(GLOB CPYRT_SOURCES CONFIGURE_DEPENDS src/cpyrt/*.cxx)
+ set(INTEROP_SOURCES
+@@ -67,6 +120,18 @@ if(TARGET CppInterOp)
+     add_dependencies(cppjit CppInterOp)
+ endif()
+ 
++if(EMSCRIPTEN)
++    # libcppjit.so is a wasm side module the kernel's embedded CPython dlopens.
++    # Its libpython and CppInterOp symbols stay undefined on purpose: the main
++    # module carries both. The exception model has to match the one CppInterOp
++    # and the kernel were built with, or the tables do not line up.
++    set(CPPJIT_WASM_FLAGS "-fPIC;-fwasm-exceptions" CACHE STRING
++        "Compiler and linker flags of the wasm side module")
++    target_compile_options(cppjit PRIVATE ${CPPJIT_WASM_FLAGS})
++    target_link_options(cppjit PRIVATE ${CPPJIT_WASM_FLAGS} -sSIDE_MODULE=1)
++    set_target_properties(cppjit PROPERTIES SUFFIX ".so")
++endif()
++
+ # The wrapper anchors these coordinates at its own load location, falling
+ # back to the install prefix (see cppinterop_paths()); the clang major
+ # names the versioned compiler probed for the runtime resource dir.
+diff --git a/src/interop/interop_wrapper.cxx b/src/interop/interop_wrapper.cxx
+index 822983b..2f0a9fd 100644
+--- a/src/interop/interop_wrapper.cxx
++++ b/src/interop/interop_wrapper.cxx
+@@ -232,7 +232,13 @@ static void configureInterpreter(const InterOpPaths& Paths) {
+ 
+   for (const std::string& dir : Paths.IncludeDirs)
+     Cpp::AddIncludePath(dir.c_str());
++#ifndef __EMSCRIPTEN__
++  // Nothing to load under emscripten: the standard library there is libc++,
++  // linked into the hosting module. The name would also resolve to something
++  // fetchable that is not wasm (a 404 page), so the loader reports "need to
++  // see wasm magic number" and leaves a failed entry behind.
+   Cpp::LoadLibrary("libstdc++", /* lookup= */ true);
++#endif
+ }
+ 
+ static bool preloadHeaders() {
+-- 
+2.55.0
+

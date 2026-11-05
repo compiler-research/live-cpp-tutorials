@@ -1,0 +1,77 @@
+name: Build kernel and wheel
+# Rebuild the two binaries the site and the cppjit CI job install from a release of this repository: the browser kernel
+# (xeus-cpp + cppjit + CppInterOp with Clad on wasm32, as kernel-overlay-<tag>.tar.gz) and the native cppjit wheel with
+# Clad inside. Everything comes from tools/build-wasm-kernel.sh, the locks and the patches in the repository; the runner's
+# 16 GB cover binaryen's wasm-opt pass (about 11.5 GB). About an hour. The digests go back as a pull request, because the
+# Pages and cppjit jobs verify the assets against lite/kernel/SHA256SUMS in the repository, not against a file beside them.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to create or update (kernel-YYYY-MM-DD)
+        required: true
+        default: kernel-2026-11-03
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      SP: ${{ github.workspace }}/.kernel-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: micromamba (pinned, digest checked, the same as tools/setup-lite-env.sh)
+        run: |
+          mkdir -p "$SP/bin"
+          curl -sSL -o "$SP/bin/micromamba" https://github.com/mamba-org/micromamba-releases/releases/download/2.9.0-0/micromamba-linux-64
+          (cd "$SP/bin" && echo "366cd9cd8be14df1ab8ed50352a82111082a36686b2d389fdb79a92c3fafb3e3  micromamba" | sha256sum -c -) && chmod +x "$SP/bin/micromamba"
+      - name: emsdk 4.0.9
+        run: |
+          git clone -q --depth 1 https://github.com/emscripten-core/emsdk.git "$SP/emsdk"
+          (cd "$SP/emsdk" && ./emsdk install 4.0.9 >/dev/null && ./emsdk activate 4.0.9 >/dev/null)
+          echo "EMSDK=$SP/emsdk" >> "$GITHUB_ENV"
+      - name: Environments (wasm32 from the lock, native LLVM 23 tools)
+        run: bash tools/build-wasm-kernel.sh envs
+      - name: Sources at the pins, patches applied
+        run: bash tools/build-wasm-kernel.sh sources
+      - name: Kernel (CppInterOp with Clad, cppjit, xeus-cpp; linked at -O1)
+        run: bash tools/build-wasm-kernel.sh build
+      - name: wasm-opt -Oz (binaryen, about 11.5 GB)
+        run: bash tools/build-wasm-kernel.sh wasm-opt
+      - name: Kernel overlay
+        run: bash tools/build-wasm-kernel.sh overlay "${{ inputs.tag }}"
+      - name: cppjit wheel with Clad
+        run: bash tools/build-wasm-kernel.sh wheel
+      - name: Digests
+        run: |
+          mkdir -p out && cp "$SP"/kernel-overlay-*.tar.gz "$SP"/cppjit-*.whl out/
+          (cd out && sha256sum kernel-overlay-*.tar.gz cppjit-*.whl | tee SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-and-wheel-${{ inputs.tag }}
+          path: out/
+      - name: Release assets
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" --title "Browser kernel and cppjit wheel with Clad, ${{ inputs.tag }}" --notes "Built by the Build kernel and wheel workflow from tools/build-wasm-kernel.sh; see lite/kernel/README.md."
+          gh release upload "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" --clobber out/kernel-overlay-*.tar.gz out/cppjit-*.whl out/SHA256SUMS
+      - name: Pull request with the new digests
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/SHA256SUMS lite/kernel/SHA256SUMS
+          sed -i "s/KERNEL_RELEASE: kernel-[0-9-]*/KERNEL_RELEASE: ${{ inputs.tag }}/" .github/workflows/deploy-pages.yml
+          sed -i "s/gh release download kernel-[0-9-]* /gh release download ${{ inputs.tag }} /" .github/workflows/check-notebooks.yml
+          git config user.name "github-actions[bot]"; git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "digests/${{ inputs.tag }}"
+          git commit -am "Kernel and wheel digests for release ${{ inputs.tag }}"
+          git push -u origin "digests/${{ inputs.tag }}"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base "${{ github.ref_name }}" --head "digests/${{ inputs.tag }}" \
+            --title "Kernel and wheel digests for ${{ inputs.tag }}" \
+            --body "Built by the Build kernel and wheel workflow (run ${{ github.run_id }}); the assets are on release ${{ inputs.tag }}. Merging this makes the Pages and cppjit jobs use them."

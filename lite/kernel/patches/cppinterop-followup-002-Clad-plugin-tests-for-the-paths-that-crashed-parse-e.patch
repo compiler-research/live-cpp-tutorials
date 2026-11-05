@@ -1,0 +1,55 @@
+From 543bf0bf622cb16cc2ed6f24a828be0870f2b70e Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Sat, 31 Oct 2026 17:10:56 +0000
+Subject: [PATCH 2/2] Clad plugin: tests for the paths that crashed (parse
+ error, then differentiate), the gradient and getCode
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ unittests/CppInterOp/CladTest.cpp | 33 +++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/unittests/CppInterOp/CladTest.cpp b/unittests/CppInterOp/CladTest.cpp
+index 36ce16c..72ea9b9 100644
+--- a/unittests/CppInterOp/CladTest.cpp
++++ b/unittests/CppInterOp/CladTest.cpp
+@@ -23,3 +23,36 @@ TYPED_TEST(CPPINTEROP_TEST_MODE, CladTest_Sanity) {
+                 .unbox<double>(),
+             6.);
+ }
++
++TYPED_TEST(CPPINTEROP_TEST_MODE, CladTest_AfterParseError) {
++  // a parse error discards the current PTU; Clad's queued calls must not be
++  // replayed over it (clad #1944, LLVM #182044)
++  Cpp::CreateInterpreter({"-std=c++17"}, {});
++  EXPECT_EQ(Cpp::Declare(R"(
++    #include "clad/Differentiator/Differentiator.h"
++    static double poly(double x, double y) { return x * x * y + 3.0 * y; }
++  )"),
++            0);
++  EXPECT_NE(Cpp::Declare("double broken( { return 1; }"), 0);
++  EXPECT_EQ(Cpp::Evaluate(R"(clad::differentiate(poly, "y").execute(2.0, 5.0))")
++                .unbox<double>(),
++            7.);
++}
++
++TYPED_TEST(CPPINTEROP_TEST_MODE, CladTest_GradientAndCode) {
++  Cpp::CreateInterpreter({"-std=c++17"}, {});
++  EXPECT_EQ(Cpp::Declare(R"(
++    #include "clad/Differentiator/Differentiator.h"
++    #include <string>
++    static double poly(double x, double y) { return x * x * y + 3.0 * y; }
++    auto g = clad::gradient(poly);
++    double gx = 0, gy = 0;
++    std::string code = clad::differentiate(poly, "x").getCode();
++  )"),
++            0);
++  EXPECT_EQ(Cpp::Process("g.execute(2.0, 5.0, &gx, &gy);"), 0);
++  EXPECT_EQ(Cpp::Evaluate("gx").unbox<double>(), 20.);
++  EXPECT_EQ(Cpp::Evaluate("gy").unbox<double>(), 7.);
++  EXPECT_EQ(Cpp::Evaluate("code.find(\"poly_darg0\") != std::string::npos").unbox<bool>(),
++            true);
++}
+-- 
+2.55.0
+

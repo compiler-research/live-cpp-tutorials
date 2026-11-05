@@ -1,0 +1,44 @@
+# emscripten-wasm32 environment of the kernel build, 2026-11-03 (micromamba explicit list): emscripten-forge-4x llvm 23.1.2,
+# emscripten-abi 4.0.9, python 3.13.1, numpy 2.5.4, scipy 1.18.0, matplotlib-base 3.11.2, pillow 13.0.0, xeus 6.0.6, xeus-lite 5.0.0
+# micromamba create -p <prefix> --platform emscripten-wasm32 -f this-file
+@EXPLICIT
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/bzip2-1.0.8-h8b79025_8.tar.bz2#8325fee5b7e0d2a1d75af8397687cf9b
+https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-hbd8a1cb_0.conda#3fd02989038a1e1cee627c14c2d73f29
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/contourpy-1.4.0-py313hb0228bc_0.tar.bz2#eea2f1f6ca27c09a220d9fc74efa2194
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/cpp-argparse-3.2-h0b0027f_0.tar.bz2#126e5511c6576b4d7cf2856ccb088a15
+https://conda.anaconda.org/conda-forge/noarch/cycler-0.12.1-pyhcf101f3_2.conda#4c2a8fef270f6c69591889b93f9f55c1
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/doctest-2.5.3-hc780342_0.tar.bz2#348a3baeabcc1f7bc1e21f1659b2faa9
+https://prefix.dev/emscripten-forge-4x/noarch/emscripten-abi-4.0.9-h267e887_9.tar.bz2#25efc842dad2785871310cfa3499ca33
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/fonttools-4.39.4-py313h6d8a2ba_2.tar.bz2#b87eb6d771533c8ea7e530724e6e5679
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/kiwisolver-1.5.1-py313hb42c9ef_0.tar.bz2#f7b8e8ff6e83617f247af0326fa6db99
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/libffi-3.4.6-hb2bca66_0.tar.bz2#8dc6585ff5e0b995eb34366150cdb07b
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/llvm-23.1.2-hd68d874_0.tar.bz2#ab52f4094b96ae12f3ad13e9695cef7d
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/matplotlib-base-3.11.2-np23py313h397d816_2.tar.bz2#a068087926375a16f97297aa131e94cf
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/nlohmann_json-3.12.0-h0b0027f_0.tar.bz2#f37ddad2267d4f29f31984b28dd258cb
+https://conda.anaconda.org/conda-forge/noarch/nlohmann_json-abi-3.12.0-h0f90c79_2.conda#849b8852621992c3f3a1901c939a0399
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/numpy-2.5.4-py313h9242c33_0.tar.bz2#9f9420971f9cd680414d980c47b2b473
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/openblas-0.3.34-h69b678e_4.tar.bz2#095501d496cd69a1c930dc9ede0f5508
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/openssl-3.6.2-hb2bca66_0.tar.bz2#3b3a27dc5fa52e897a7c766a2c1019ea
+https://conda.anaconda.org/conda-forge/noarch/packaging-26.3-pyhc364b38_0.conda#936687ed80f295a1f5dbcf8bd34c252c
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pillow-13.0.0-py313hd87ed1a_0.tar.bz2#4829cd9d0bf7ac39ffa0a756ccf942d6
+https://conda.anaconda.org/conda-forge/noarch/pip-26.2.2-pyh145f28c_1.conda#63f4cc1f78c0da07623849c916ce71d7
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pugixml-1.16-hc780342_0.tar.bz2#d6d96794651a1fe4cd4ed0fa56a3933e
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pybind11-2.13.6-py313h313682a_1.tar.bz2#d9dc163913748c2b5498124953fdaa35
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pybind11_json-0.2.15-py313h313682a_0.tar.bz2#d0e0c35efe155deece7956556bb39e88
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pyjs-4.1.0-hc286ada_0.tar.bz2#c6baa0e6b2c0d96a013e11607bba1f2f
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pyjs-dev-4.1.0-py313h06ab7c0_0.tar.bz2#bc2a013721c9937a8a00c5075482d8b5
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/pyjs-rt-4.1.0-py313h06ab7c0_0.tar.bz2#5865be596065b3c69ba0c8d9cd027130
+https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.3.3-pyh5ded981_0.conda#8bf43ae1312e9b966063459e04c20fa7
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/python-3.13.1-h_2efca29_11_cp313.tar.bz2#6541a249de9b863533e745bdeeb6d346
+https://conda.anaconda.org/conda-forge/noarch/python-dateutil-4.0.0-pyh5ded981_0.conda#32ce63457e76085c204f2db1ec8fef01
+https://conda.anaconda.org/conda-forge/noarch/python-tzdata-2026.6-pyh5ded981_0.conda#cddcce875e2021c3a5b9dbecffb70d92
+https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda#c5abc97af551bc12d71305852392f75c
+https://conda.anaconda.org/conda-forge/noarch/pytz-2026.6-pyh5ded981_0.conda#9b60b8aadafa78f7581c49a057764e7f
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/qhull-2020.2-h0b0027f_1.tar.bz2#d7d859c9b2182b224d795b6c9a6644d3
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/scipy-1.18.0-np23py313h8db5e5d_4.tar.bz2#ae860beb98ed1376f64408992991bbe1
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/sqlite-3.47.2-h640cba9_1.tar.bz2#6a126ba50f20242797e57ce7252ec1d1
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/xeus-6.0.6-hc780342_0.tar.bz2#02920c9fadcc096f6654223f19e3f3d0
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/xeus-lite-5.0.0-h0b0027f_0.tar.bz2#6389e93eac7ac6da67f1b54df37c7c31
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/xtl-0.8.2-h0b0027f_0.tar.bz2#0f1ab5cae41a48c05fa736a942ae5c81
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/xz-5.8.4-hb9d79b4_0.tar.bz2#594cae2a66d8a0476a93a183448cba5a
+https://prefix.dev/emscripten-forge-4x/emscripten-wasm32/zlib-1.3.2-h8b79025_0.tar.bz2#651e098a93f31fe5302c19a912944d5d

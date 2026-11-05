@@ -1,0 +1,48 @@
+From de7e25188185e5107b7676ecf402bd5ea7c54974 Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Mon, 2 Nov 2026 18:26:58 +0000
+Subject: [PATCH 1/2] Do not hand the wasm exception flags to the clad
+ cross-build
+
+Follow-up to 'Enable Clad plugin in WASM' (PR 1167). With emsdk 4.0.9 the
+clad sub-build fails on every object: CMAKE_CXX_FLAGS carries
+-fwasm-exceptions, add_llvm_library appends -fno-exceptions after it, emcc
+takes the last word, selects the emscripten setjmp/longjmp lowering, and
+clang rejects '-fwasm-exceptions' alongside '-enable-emscripten-sjlj'.
+clangCppInterOp does not hit this because its flag is added per target,
+after LLVM's. The ExternalProject logs hide the error (LOG_BUILD ON), so
+the CI row only reports the exit code.
+
+Build clad as LLVM itself is built, without exceptions; the exception model
+belongs to the link of clangCppInterOp and the kernel.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ plugins/clad/CMakeLists.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/plugins/clad/CMakeLists.txt b/plugins/clad/CMakeLists.txt
+index 3bef5ed..4965514 100644
+--- a/plugins/clad/CMakeLists.txt
++++ b/plugins/clad/CMakeLists.txt
+@@ -5,6 +5,17 @@ set(clad_install_dir ${CMAKE_BINARY_DIR}/plugins/clad/)
+ set(CLAD_INCLUDE_DIRS ${clad_install_dir})
+ # Clad Libraries
+ set(CLAD_CXX_FLAGS ${CMAKE_CXX_FLAGS})
++if(EMSCRIPTEN AND CPPINTEROP_EXTRA_WASM_FLAGS)
++  # clad's archives are LLVM-style targets: add_llvm_library appends
++  # -fno-exceptions after these flags, and emcc then reads exceptions as
++  # disabled while -fwasm-exceptions is still on the line, picks the
++  # emscripten setjmp/longjmp lowering and clang rejects the pair
++  # ("-fwasm-exceptions not allowed with -enable-emscripten-sjlj"). Build
++  # clad as LLVM itself is built, without exceptions; the exception model
++  # is decided where clangCppInterOp and the kernel are linked.
++  string(REPLACE "${CPPINTEROP_EXTRA_WASM_FLAGS}" "" CLAD_CXX_FLAGS "${CLAD_CXX_FLAGS}")
++  string(STRIP "${CLAD_CXX_FLAGS}" CLAD_CXX_FLAGS)
++endif()
+ set(_clad_build_type ${CLAD_BUILD_TYPE})
+ if(MSVC AND NOT CMAKE_GENERATOR MATCHES Ninja)
+   if (winrtdebug)
+-- 
+2.55.0
+

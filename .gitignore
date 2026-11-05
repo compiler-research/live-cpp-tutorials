@@ -1,0 +1,8 @@
+lite/dist/
+lite/content/
+lite/labext/
+lite/lazy-packages/
+lite/kernel-artifacts/
+lite/.jupyterlite.doit.db
+executed/
+__pycache__/

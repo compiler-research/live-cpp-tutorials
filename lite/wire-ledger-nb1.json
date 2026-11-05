@@ -1,0 +1,13 @@
+{
+ "notebook": "cppjit/1_call_it.ipynb",
+ "total_bytes": 52212097,
+ "groups": {
+  "app shell, extensions, files": 8209852,
+  "C++ kernel": 37523689,
+  "shared libraries on demand": 85897,
+  "Python packages at start": 6392659
+ },
+ "ui_s": 4.253089666366577,
+ "done_s": 12.64185619354248,
+ "done": true
+}

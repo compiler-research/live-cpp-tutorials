@@ -122,3 +122,42 @@ jobs:
           name: executed-cuda-notebooks
           path: executed/
           if-no-files-found: ignore
+
+  execute-notebooks-cppjit:
+    name: cppjit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+      - name: List available kernels
+        run: jupyter kernelspec list
+      - name: cppjit wheel with Clad from the release (digest checked against lite/kernel/SHA256SUMS)
+        # Under nektos/act (ACT=true) the wheel is expected in lite/kernel-artifacts already; see lite/README-build.md.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p lite/kernel-artifacts
+          if [ -z "$ACT" ]; then
+            gh release download kernel-2026-11-03 --repo "$GITHUB_REPOSITORY" --dir lite/kernel-artifacts --pattern 'cppjit-*.whl'
+          fi
+          (cd lite/kernel-artifacts && sha256sum -c --ignore-missing ../kernel/SHA256SUMS)
+          $CONDA_PREFIX/bin/pip install lite/kernel-artifacts/cppjit-*.whl
+      - name: Run cppjit notebook tests (Python kernel, C++ compiled by cppjit)
+        run: |
+          mkdir -p executed
+          $CONDA_PREFIX/bin/pytest tests/test_notebooks.py::CppjitNotebookTests -sv
+      - name: Upload executed cppjit notebooks as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-cppjit-notebooks
+          path: executed/
+          if-no-files-found: ignore

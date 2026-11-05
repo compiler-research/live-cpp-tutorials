@@ -1,0 +1,69 @@
+From e926f961ae35569a552abd5d7ef3f61f7a66a07d Mon Sep 17 00:00:00 2001
+From: Vassil Vassilev <v.g.vassilev@gmail.com>
+Date: Tue, 3 Nov 2026 09:18:00 +0000
+Subject: [PATCH] Build the bundled CppInterOp with Clad on request
+
+CPPJIT_ENABLE_CLAD forwards CPPINTEROP_ENABLE_CLAD (and CPPJIT_CLAD_SOURCE_DIR
+as CLAD_SOURCE_DIR) to the CppInterOp sub-build and runs its whole install,
+since the plugin's runtime headers belong to no install component; they
+then ship under interop/include/clad and clad::gradient works in the
+session of a pip-installed cppjit. Off by default; an external CppInterOp
+is left to its own build.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ cmake/AddCppInterOp.cmake | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/cmake/AddCppInterOp.cmake b/cmake/AddCppInterOp.cmake
+index 59b397b..8acdc8a 100644
+--- a/cmake/AddCppInterOp.cmake
++++ b/cmake/AddCppInterOp.cmake
+@@ -23,6 +23,10 @@ endif()
+ 
+ # Developer toggle: Cling from either ROOT or standalone supplies LLVM_DIR/Clang_DIR
+ option(CPPJIT_USE_CLING "Build CppInterOp against a prebuilt Cling C++ Interpreter (ROOT)" OFF)
++# Clad inside the bundled CppInterOp (CPPINTEROP_ENABLE_CLAD): clad::gradient works in the session and the Clad
++# runtime headers ship under interop/include/clad. Not for an external CppInterOp (its build decides).
++option(CPPJIT_ENABLE_CLAD "Build the bundled CppInterOp with the Clad plugin" OFF)
++set(CPPJIT_CLAD_SOURCE_DIR "" CACHE PATH "Clad checkout for the plugin; CppInterOp's pinned Clad when empty")
+ mark_as_advanced(CPPJIT_USE_CLING)
+ 
+ set(Cling_DIR "" CACHE PATH "Cling CMake config dir; derived from LLVM_DIR when empty (cling mode only)")
+@@ -161,6 +165,12 @@ function(cppjit_add_cppinterop)
+         if(Clang_DIR)
+             list(APPEND _args -DClang_DIR=${Clang_DIR})
+         endif()
++        if(CPPJIT_ENABLE_CLAD)
++            list(APPEND _args -DCPPINTEROP_ENABLE_CLAD=ON)
++            if(CPPJIT_CLAD_SOURCE_DIR)
++                list(APPEND _args -DCLAD_SOURCE_DIR=${CPPJIT_CLAD_SOURCE_DIR})
++            endif()
++        endif()
+         if(CMAKE_C_COMPILER)
+             list(APPEND _args -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
+         endif()
+@@ -201,13 +211,17 @@ function(cppjit_add_cppinterop)
+             string(APPEND _install_lib_target "-stripped")
+         endif()
+ 
+-        # Install only the library and headers, not CppInterOp's full install tree.
++        # Install only the library and headers, not CppInterOp's full install tree. With Clad the plugin's runtime
++        # headers (include/clad) belong to no install component, so the whole install runs.
++        set(_install_targets ${_install_lib_target} install-cppinterop-headers)
++        if(CPPJIT_ENABLE_CLAD)
++            set(_install_targets install/strip)
++        endif()
+         ExternalProject_Add(CppInterOp
+             ${_source_args}
+             PREFIX         "${CMAKE_BINARY_DIR}/CppInterOp"
+             CMAKE_ARGS     ${_args}
+-            INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR>
+-                            --target ${_install_lib_target} install-cppinterop-headers
++            INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target ${_install_targets}
+             BUILD_BYPRODUCTS
+                 "${CPPINTEROP_STAGE_DIR}/lib/libclangCppInterOp${CMAKE_SHARED_LIBRARY_SUFFIX}"
+             ${_log_args}
+-- 
+2.55.0
+

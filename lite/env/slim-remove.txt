@@ -1,0 +1,11 @@
+# conda-meta entries dropped from the kernel environment before packing (tools/setup-lite-env.sh): build-time only,
+# nothing of them is needed by the running kernel (headers, CMake packages, the LLVM the kernel was linked against)
+llvm
+cpp-argparse
+doctest
+pugixml
+pybind11
+pybind11_json
+xtl
+pip
+pyjs-dev
