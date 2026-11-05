@@ -55,7 +55,7 @@ def _cpp():
 
 
 import re as _re
-_NAME = _re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*\.(tar\.gz|json)$")
+_NAME = _re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*\.(tar\.gz|json|so)$")
 _BASE = _re.compile(r"^https?://[A-Za-z0-9.:_/%+-]*$")
 
 
@@ -96,6 +96,20 @@ def ensure(name, verbose=True):
         how = f"{fetched / 1048576:.1f} MB downloaded now" if fetched else "already downloaded in the background"
         print(f"[browser] {name} unpacked in {time.time() - t0:.1f} s ({how})", file=sys.stderr)
 
+
+def load_library(name, verbose=True):
+    """Download the shared library `<site>/lazy/<name>` once and load it into the kernel (cppjit.load_library).
+    For libraries only one notebook needs: files under the notebook's data/ are packed into every kernel's start-up
+    download, files under lazy/ are fetched by the notebook that asks for them."""
+    import cppjit
+    path = os.path.join(CACHE, name)
+    if _state.get(name) == "loaded": return path
+    os.makedirs(CACHE, exist_ok=True); t0 = time.time()
+    r = str(_cpp().fetch_sync(_url(name), path))
+    if not r.isdigit(): raise ImportError(f"sc26 lazy: could not fetch {name}: {r}")
+    cppjit.load_library(path); _state[name] = "loaded"
+    if verbose: print(f"[browser] {name}: {int(r) / 1048576:.1f} MB downloaded and loaded in {time.time() - t0:.1f} s", file=sys.stderr)
+    return path
 
 class _Finder(importlib.abc.MetaPathFinder):
     """On the first import of a lazy top-level module, fetch and extract it, then defer to the normal finders."""

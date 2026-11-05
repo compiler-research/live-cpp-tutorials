@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p lite/kernel-artifacts
           gh release download "$KERNEL_RELEASE" --repo "$GITHUB_REPOSITORY" --dir lite/kernel-artifacts \
-            --pattern 'kernel-overlay-*.tar.gz'
+            --pattern 'kernel-overlay-*.tar.gz' --pattern 'libcartopiax.so'
       - name: Verify the kernel binaries against the digests committed in lite/kernel/SHA256SUMS
         run: (cd lite/kernel-artifacts && sha256sum -c --ignore-missing ../kernel/SHA256SUMS) && ls -la lite/kernel-artifacts
       - name: Build environment (micromamba, host venv, wasm32 env from the lock, kernel overlay)
