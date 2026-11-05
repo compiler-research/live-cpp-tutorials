@@ -167,8 +167,10 @@ LTO). `tools/build-wasm-kernel.sh` takes that install through `LLVM_WASM_DIR`, a
 carries that kernel (the -Oz + LTO build of 2026-11-04, verified twice in the browser on the smoke cells and the five
 notebooks). `build-kernel.yml` still builds against the conda package: until the LLVM install is published as a cell or
 release asset it can download, a rerun of that workflow proposes the larger kernel's digest. With the smaller kernel the
-wire figures in the table above drop by 8.2 MB (the module's gzip size, 32.5 to 24.3 MB): about 41.6 MB for the first
-notebook, 61.6 MB with SciPy and matplotlib loaded; to be re-measured on the public site.
+wire figures in the table above drop by about 8 MB. Measured on the public site on 2026-11-05 with an empty cache: 42.0 MB
+for the first notebook (28.0 MB of it the kernel), 72.0 MB for notebook 4 when the run is faster than the background
+download and SciPy is fetched twice, about 62 MB at reading pace. Shipping matplotlib's mathtext and monospace fonts
+(to silence the findfont warnings) adds 1.5 MB to its lazy tarball.
 
 The preloaded filesystem (`xcpp.data`) left out what a notebook kernel never includes (the sysroot's SDL, GL, X11 and
 sanitizer headers, the other architectures' intrinsics in clang's resource directory, `pydoc_data`): 46.5 to 27.5 MB raw,
