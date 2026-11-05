@@ -38,6 +38,15 @@ for nb in sorted(src.glob("*.ipynb")):
 print(f"[content] {len(list(dst.glob('*.ipynb')))} C++ notebooks -> {dst}")
 PY
 cp "$REPO/lite/README.md" "$CONTENT/README.md"
+# Browser-only notebooks (lite/notebooks): 6_cartopiax runs the CARTopiaX model from a WebAssembly library that the
+# notebook downloads itself (kernel/lazy.py load_library), so the other notebooks do not pay for it. The library is a
+# release asset next to the kernel overlay; without it the notebook is left out of the site.
+CARTOPIAX_SO=${CARTOPIAX_SO:-${KERNEL_ART:-$REPO/lite/kernel-artifacts}/libcartopiax.so}
+if [ -f "$CARTOPIAX_SO" ]; then
+  "$BUILD_ENV/bin/python" "$REPO/tools/home2lite.py" "$REPO/lite/notebooks" "$CONTENT/cppjit"
+else
+  echo "[content] no $CARTOPIAX_SO: leaving out the CARTopiaX notebook"
+fi
 
 # lite/labext holds symlinks to the two extensions the site needs (the xeus kernel extension and the notebook UI); the
 # build environment's other extensions (pyodide, javascript, p5 kernels, themes) stay out.
@@ -78,6 +87,7 @@ ls -la "$STATIC"/*.so | awk '{printf "  %7.2f MB  %s\n",$5/1048576,$9}'
 # Packages loaded on first import by kernel/lazy.py (not in the start-up set): the tarballs packed from xeus-slim.
 echo "[site] lazy packages -> $OUT/lazy/"
 mkdir -p "$OUT/lazy" && cp "$REPO"/lite/lazy-packages/*.tar.gz "$OUT/lazy/" && du -sh "$OUT/lazy" | cut -f1 | xargs echo "  lazy packages:"
+if [ -f "$CARTOPIAX_SO" ]; then cp "$CARTOPIAX_SO" "$OUT/lazy/libcartopiax.so"; echo "  CARTopiaX library: $(du -h "$OUT/lazy/libcartopiax.so" | cut -f1)"; fi
 # package name -> tarball file, read by kernel/lazy.py at start (lazy.json names packages, not builds)
 "$BUILD_ENV/bin/python" - "$OUT/lazy" <<'PY'
 import json, pathlib, re, sys
