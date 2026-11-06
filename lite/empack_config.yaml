@@ -112,11 +112,10 @@ packages:
       pattern: share/cmake/**
     - &id021
       pattern: '**/*.pc'
+    # matplotlib's default mathtext set asks for DejaVu Sans Display, the STIX and the Computer Modern fonts, and the
+    # monospace family for DejaVu Sans Mono: without them every figure logs a findfont fallback per font. Only the serif
+    # family stays out (the notebooks never ask for it).
     - pattern: '**/mpl-data/fonts/ttf/DejaVuSerif*'
-    - pattern: '**/mpl-data/fonts/ttf/DejaVuSansMono*'
-    - pattern: '**/mpl-data/fonts/ttf/DejaVuSansDisplay*'
-    - pattern: '**/mpl-data/fonts/ttf/STIX*'
-    - pattern: '**/mpl-data/fonts/ttf/cm*.ttf'
     - pattern: '**/mpl-data/fonts/afm/**'
     - pattern: '**/mpl-data/fonts/pdfcorefonts/**'
     - pattern: '**/mpl-data/sample_data/**'
